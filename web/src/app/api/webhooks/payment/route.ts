@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHmac } from "crypto";
 
-// Use service role key for webhook processing (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Supabase client will be initialized inside the handler
 
 /**
  * Verify HMAC-SHA256 signature from payment gateway (PayOS / Casso / SeABank)
@@ -27,6 +23,12 @@ function verifyWebhookSignature(payload: string, signature: string): boolean {
 
 export async function POST(request: Request) {
   try {
+    // Use service role key for webhook processing (bypasses RLS)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    
+    const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+
     const rawBody = await request.text();
     const body = JSON.parse(rawBody);
 
