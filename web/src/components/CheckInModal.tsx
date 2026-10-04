@@ -1,8 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, CheckCircle2, Award, FileText, Calendar, Upload, FileCheck, Paperclip, Trash2 } from "lucide-react";
+import { X, CheckCircle2, Award, FileText, Calendar, Upload, FileCheck, Paperclip, Trash2, Trophy } from "lucide-react";
 import { uploadHomeworkFileToStorage } from "@/lib/storage";
+
+export interface RescheduleRequest {
+  id: string;
+  reason: string;
+  proposedDate?: string;
+  proposedTime?: string;
+  status: "PENDING" | "ACCEPTED" | "REJECTED";
+  createdAt: string;
+}
 
 export interface ClassSessionItem {
   id: string;
@@ -13,11 +22,13 @@ export interface ClassSessionItem {
   time: string;
   date: string;
   month: string;
-  status: "COMPLETED" | "SCHEDULED" | "CANCELLED";
+  status: "COMPLETED" | "SCHEDULED" | "CANCELLED" | "RESCHEDULED";
   homework?: string;
   homeworkFile?: { name: string; size: string; url: string } | null;
   tutorFeedback?: string;
+  testScore?: number; // Thang điểm 10
   icon?: any;
+  rescheduleRequest?: RescheduleRequest | null;
 }
 
 interface CheckInModalProps {
@@ -31,7 +42,8 @@ export function CheckInModal({ isOpen, session, onClose, onSaveSession }: CheckI
   const [topic, setTopic] = useState("");
   const [homework, setHomework] = useState("");
   const [tutorFeedback, setTutorFeedback] = useState("");
-  const [status, setStatus] = useState<"COMPLETED" | "SCHEDULED" | "CANCELLED">("COMPLETED");
+  const [testScore, setTestScore] = useState<string>("");
+  const [status, setStatus] = useState<"COMPLETED" | "SCHEDULED" | "CANCELLED" | "RESCHEDULED">("COMPLETED");
   const [uploadedFile, setUploadedFile] = useState<{ name: string; size: string; url: string } | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -40,6 +52,7 @@ export function CheckInModal({ isOpen, session, onClose, onSaveSession }: CheckI
       setTopic(session.topic || session.roadmapTopic || "");
       setHomework(session.homework || "");
       setTutorFeedback(session.tutorFeedback || "");
+      setTestScore(session.testScore !== undefined ? String(session.testScore) : "");
       setStatus(session.status === "SCHEDULED" ? "COMPLETED" : session.status);
       setUploadedFile(session.homeworkFile || null);
     }
@@ -71,6 +84,7 @@ export function CheckInModal({ isOpen, session, onClose, onSaveSession }: CheckI
       homework,
       homeworkFile: uploadedFile,
       tutorFeedback,
+      testScore: testScore !== "" ? Number(testScore) : undefined,
       status,
     });
     onClose();
@@ -133,11 +147,20 @@ export function CheckInModal({ isOpen, session, onClose, onSaveSession }: CheckI
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Thời gian học</label>
-              <div className="px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-200 text-xs font-medium flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-indigo-400 shrink-0" />
-                <span>{session.date}</span>
-              </div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center gap-1">
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                Điểm kiểm tra (Thang 10)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.5"
+                placeholder="VD: 8.5"
+                value={testScore}
+                onChange={(e) => setTestScore(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-amber-300 font-bold placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs"
+              />
             </div>
           </div>
 
@@ -172,7 +195,7 @@ export function CheckInModal({ isOpen, session, onClose, onSaveSession }: CheckI
             {!uploadedFile ? (
               <label className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 cursor-pointer transition text-xs font-semibold text-purple-300">
                 <Upload className="w-4 h-4 text-purple-400" />
-                {uploading ? "Đang tải file lên Supabase Storage..." : "Tải file bài tập lên (PDF, Word, Ảnh đề bài)"}
+                {uploading ? "Đang tải file lên Cloud Storage..." : "Tải file bài tập lên (PDF, Word, Ảnh)"}
                 <input 
                   type="file" 
                   accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" 

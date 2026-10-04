@@ -31,11 +31,14 @@ import {
   Check,
   FileText,
   Send,
-  Filter
+  Filter,
+  X,
+  QrCode
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AddStudentModal, NewStudentPayload } from "@/components/AddStudentModal";
 import { CheckInModal, ClassSessionItem } from "@/components/CheckInModal";
+import { ZaloReceiptModal } from "@/components/ZaloReceiptModal";
 import { Student } from "@/types/database";
 import { 
   fetchStudentsFromDB, 
@@ -84,6 +87,12 @@ export default function Dashboard() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [copiedNotice, setCopiedNotice] = useState<string | null>(null);
 
+  // Zalo & VietQR Modal State
+  const [selectedZaloStudent, setSelectedZaloStudent] = useState<Student | null>(null);
+
+  // Reschedule Requests Drawer State
+  const [showRescheduleDrawer, setShowRescheduleDrawer] = useState(false);
+
   // Load Real Data from Supabase DB on startup
   useEffect(() => {
     async function loadDBData() {
@@ -97,11 +106,70 @@ export default function Dashboard() {
         ...s,
         icon: getSubjectIcon(s.subject),
       }));
+
+      // Add demo pending reschedule request for interactive testing if none exist
+      if (mappedSessions.length > 0 && !mappedSessions.some((s) => s.rescheduleRequest)) {
+        mappedSessions[0].rescheduleRequest = {
+          id: "req-demo-1",
+          reason: "Con bị trùng lịch thi giữa kỳ ở trường",
+          proposedDate: "2026-10-18",
+          proposedTime: "19h30 - 21h30",
+          status: "PENDING",
+          createdAt: new Date().toISOString(),
+        };
+      }
+
       setUpcomingClasses(mappedSessions);
       setLoading(false);
     }
     loadDBData();
   }, []);
+
+  const pendingRescheduleCount = upcomingClasses.filter(
+    (c) => c.rescheduleRequest && c.rescheduleRequest.status === "PENDING"
+  ).length;
+
+  const handleApproveReschedule = (session: ClassSessionItem) => {
+    if (!session.rescheduleRequest) return;
+    const newDate = session.rescheduleRequest.proposedDate || session.date;
+    const newTime = session.rescheduleRequest.proposedTime || session.time;
+
+    setUpcomingClasses((prev) =>
+      prev.map((item) => {
+        if (item.id === session.id) {
+          return {
+            ...item,
+            date: newDate,
+            time: newTime,
+            status: "SCHEDULED",
+            rescheduleRequest: {
+              ...item.rescheduleRequest!,
+              status: "ACCEPTED",
+            },
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleRejectReschedule = (session: ClassSessionItem) => {
+    if (!session.rescheduleRequest) return;
+    setUpcomingClasses((prev) =>
+      prev.map((item) => {
+        if (item.id === session.id) {
+          return {
+            ...item,
+            rescheduleRequest: {
+              ...item.rescheduleRequest!,
+              status: "REJECTED",
+            },
+          };
+        }
+        return item;
+      })
+    );
+  };
 
   // Add Student & Roadmap Sessions
   const handleAddStudent = async (payload: NewStudentPayload) => {
@@ -194,6 +262,89 @@ export default function Dashboard() {
         onSaveSession={handleSaveSession}
       />
 
+      {/* Zalo & VietQR Modal */}
+      {selectedZaloStudent && (
+        <ZaloReceiptModal
+          isOpen={!!selectedZaloStudent}
+          student={selectedZaloStudent}
+          completedCount={upcomingClasses.filter(c => c.student === selectedZaloStudent.name && c.month === currentMonthStr && c.status === "COMPLETED").length}
+          totalCount={upcomingClasses.filter(c => c.student === selectedZaloStudent.name && c.month === currentMonthStr).length || 8}
+          totalFee={upcomingClasses.filter(c => c.student === selectedZaloStudent.name && c.month === currentMonthStr && c.status === "COMPLETED").length * (selectedZaloStudent.hourlyRate || 200000)}
+          monthStr={currentMonthStr}
+          isPaid={paidStatusMap[selectedZaloStudent.id] || false}
+          onClose={() => setSelectedZaloStudent(null)}
+          onTogglePaidStatus={(studentId, paid) => setPaidStatusMap(prev => ({ ...prev, [studentId]: paid }))}
+        />
+      )}
+
+      {/* Reschedule Requests Drawer */}
+      {showRescheduleDrawer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="glass w-full max-w-lg rounded-2xl p-6 relative shadow-2xl border border-white/10 space-y-4">
+            <button
+              onClick={() => setShowRescheduleDrawer(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Yêu Cầu Xin Nghỉ / Đổi Lịch Từ Phụ Huynh</h3>
+                <p className="text-xs text-slate-400">Danh sách các đề xuất học bù cần Gia sư xét duyệt</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+              {upcomingClasses.filter(c => c.rescheduleRequest && c.rescheduleRequest.status === "PENDING").map((session) => (
+                <div key={session.id} className="p-4 rounded-xl bg-white/5 border border-amber-500/20 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{session.student}</h4>
+                      <p className="text-xs text-slate-400">Bài: {session.topic} ({session.date})</p>
+                    </div>
+                    <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30">
+                      Chờ duyệt
+                    </span>
+                  </div>
+
+                  <div className="bg-amber-950/40 p-2.5 rounded-lg border border-amber-500/20 text-xs text-amber-200">
+                    <p className="font-semibold mb-0.5">Lý do: {session.rescheduleRequest?.reason}</p>
+                    {session.rescheduleRequest?.proposedDate && (
+                      <p className="text-slate-300">Đề xuất giờ mới: <strong>{session.rescheduleRequest.proposedDate} ({session.rescheduleRequest.proposedTime || session.time})</strong></p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => handleApproveReschedule(session)}
+                      className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm"
+                    >
+                      ✅ Duyệt & Đổi Lịch
+                    </button>
+                    <button
+                      onClick={() => handleRejectReschedule(session)}
+                      className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-xs font-medium transition"
+                    >
+                      Từ Chối
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {upcomingClasses.filter(c => c.rescheduleRequest && c.rescheduleRequest.status === "PENDING").length === 0 && (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  Chưa có yêu cầu đổi lịch mới nào cần xử lý.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar Navigation */}
       <aside className="w-64 glass hidden md:flex flex-col border-r border-white/5 m-3 rounded-2xl">
         <div className="p-5 flex items-center gap-3 border-b border-white/5">
@@ -279,6 +430,16 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            {pendingRescheduleCount > 0 && (
+              <button
+                onClick={() => setShowRescheduleDrawer(true)}
+                className="px-3.5 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-2 transition animate-pulse"
+              >
+                <Calendar className="w-4 h-4 text-amber-400" />
+                {pendingRescheduleCount} Yêu cầu đổi lịch
+              </button>
+            )}
+
             <Link
               href="/p/demo-student-123"
               target="_blank"
@@ -818,14 +979,14 @@ export default function Dashboard() {
                           {isPaid ? "✅ Đã Đóng" : "⏳ Chưa Đóng"}
                         </button>
 
-                        {/* Copy Zalo Notice Button */}
+                        {/* QR Bank & Zalo Receipt Modal Trigger */}
                         <button
-                          onClick={() => handleCopyZaloNotice(st, stCompleted.length, stSessions.length || 8, stFee)}
-                          className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
-                          title="Tạo tin nhắn gửi Phụ huynh Zalo"
+                          onClick={() => setSelectedZaloStudent(st)}
+                          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:opacity-95 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                          title="Xem mã VietQR và tạo Biên lai Zalo"
                         >
-                          {copiedNotice === st.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Send className="w-3.5 h-3.5" />}
-                          Tạo Tin Zalo
+                          <QrCode className="w-3.5 h-3.5 text-amber-300" />
+                          QR & Biên Lai Zalo
                         </button>
                       </div>
                     </div>

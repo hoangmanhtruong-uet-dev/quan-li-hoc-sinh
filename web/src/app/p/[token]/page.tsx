@@ -17,12 +17,17 @@ import {
   QrCode,
   Send,
   MessageSquare,
-  X
+  X,
+  Printer,
+  Trophy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchStudentsFromDB, fetchSessionsFromDB } from "@/lib/db";
 import { Student } from "@/types/database";
 import { ClassSessionItem } from "@/components/CheckInModal";
+import { StudentProgressChart } from "@/components/StudentProgressChart";
+import { PrintableReportModal } from "@/components/PrintableReportModal";
+import { RescheduleModal } from "@/components/RescheduleModal";
 import { useParams } from "next/navigation";
 
 export default function ParentPortalPage() {
@@ -37,10 +42,16 @@ export default function ParentPortalPage() {
   // VietQR Modal State
   const [showQRModal, setShowQRModal] = useState(false);
   
+  // PDF Report Modal State
+  const [showPDFModal, setShowPDFModal] = useState(false);
+
   // Feedback Modal State
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [parentNote, setParentNote] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
+
+  // Reschedule Modal State
+  const [rescheduleSessionTarget, setRescheduleSessionTarget] = useState<ClassSessionItem | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -78,20 +89,56 @@ export default function ParentPortalPage() {
     }, 2000);
   };
 
+  const handleRescheduleSubmit = (sessionId: string, reason: string, proposedDate?: string, proposedTime?: string) => {
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id === sessionId) {
+          return {
+            ...s,
+            rescheduleRequest: {
+              id: `req-${Date.now()}`,
+              reason,
+              proposedDate,
+              proposedTime,
+              status: "PENDING",
+              createdAt: new Date().toISOString(),
+            },
+          };
+        }
+        return s;
+      })
+    );
+  };
+
   const completedSessionsCount = sessions.filter((s) => s.status === "COMPLETED").length;
   const currentMonthStr = "Tháng 10/2026";
   const hourlyRate = student?.hourlyRate || 200000;
   const actualFee = completedSessionsCount * hourlyRate;
   const projectedFee = (sessions.length || 8) * hourlyRate;
 
-  // VietQR Code URL (MBBank / Techcombank demo QR)
-  const bankAccount = "999988886666";
-  const bankName = "MBBANK";
-  const qrCodeUrl = `https://img.vietqr.io/image/${bankName}-${bankAccount}-compact2.png?amount=${actualFee}&addInfo=Dong%20hoc%20phi%20Thang10%20${encodeURIComponent(student?.name || "HocSinh")}&accountName=GIA%20SU%20HOANG`;
+  // VietQR Code Details - HOANG MANH TRUONG
+  const tutorName = "HOANG MANH TRUONG";
+  const bankName = "MBBank / SeABank (VietQR)";
 
   return (
     <div className="min-h-screen bg-[#0a0c14] text-slate-100 pb-12">
       
+      {/* Printable PDF Modal */}
+      <PrintableReportModal
+        isOpen={showPDFModal}
+        student={student}
+        sessions={sessions}
+        onClose={() => setShowPDFModal(false)}
+      />
+
+      {/* Reschedule Modal */}
+      <RescheduleModal
+        isOpen={!!rescheduleSessionTarget}
+        session={rescheduleSessionTarget}
+        onClose={() => setRescheduleSessionTarget(null)}
+        onSubmitRequest={handleRescheduleSubmit}
+      />
+
       {/* VietQR Modal */}
       {showQRModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
@@ -105,32 +152,43 @@ export default function ParentPortalPage() {
 
             <div className="space-y-1 pt-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
-                Chuyển Khoản Tự Động
+                Mã VietQR Chính Chủ
               </span>
-              <h3 className="text-lg font-bold text-white">Mã QR Thanh Toán Học Phí</h3>
-              <p className="text-xs text-slate-400">Quét mã bằng ứng dụng Ngân hàng / ZaloPay</p>
+              <h3 className="text-lg font-bold text-white">Chuyển Khoản Học Phí</h3>
+              <p className="text-xs text-slate-400">Tên TK nhận: <strong className="text-white">{tutorName}</strong></p>
             </div>
 
             <div className="bg-white p-3 rounded-2xl border border-white/10 inline-block mx-auto shadow-inner">
               <img 
-                src={qrCodeUrl} 
-                alt="Mã QR Học Phí VietQR" 
+                src="/qr-hoangmanhtruong.png" 
+                alt={`Mã QR Nhận Tiền ${tutorName}`} 
                 className="w-56 h-56 object-contain mx-auto rounded-lg"
               />
             </div>
 
-            <div className="bg-white/5 p-3 rounded-xl border border-white/5 text-xs text-left space-y-1">
+            <div className="pt-1">
+              <a
+                href="/qr-hoangmanhtruong.png"
+                download={`VietQR_${tutorName}.png`}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-md"
+              >
+                <Download className="w-4 h-4" />
+                Tải Mã QR Về Máy
+              </a>
+            </div>
+
+            <div className="bg-white/5 p-3 rounded-xl border border-white/5 text-xs text-left space-y-1.5">
               <div className="flex justify-between">
-                <span className="text-slate-400">Số tiền:</span>
-                <span className="font-bold text-amber-400">{actualFee.toLocaleString()} VNĐ</span>
+                <span className="text-slate-400">Chủ tài khoản:</span>
+                <span className="font-bold text-amber-300">{tutorName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Ngân hàng:</span>
-                <span className="font-bold text-white">{bankName}</span>
+                <span className="text-slate-400">Số tiền cần đóng:</span>
+                <span className="font-bold text-emerald-400">{actualFee.toLocaleString()} VNĐ</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Số TK:</span>
-                <span className="font-mono font-bold text-indigo-300">{bankAccount}</span>
+                <span className="text-slate-400">Cú pháp CK:</span>
+                <span className="font-mono text-xs text-indigo-300">Dong hoc phi {student?.name || "HocSinh"} T10</span>
               </div>
             </div>
           </div>
@@ -154,7 +212,7 @@ export default function ParentPortalPage() {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">Lời Nhắn Cho Gia Sư</h3>
-                <p className="text-xs text-slate-400">Gửi dặn dò hoặc phản hồi cho Gia sư phụ trách</p>
+                <p className="text-xs text-slate-400">Gửi dặn dò hoặc phản hồi cho Gia sư {tutorName}</p>
               </div>
             </div>
 
@@ -203,13 +261,23 @@ export default function ParentPortalPage() {
             </div>
           </div>
 
-          <button
-            onClick={handleCopyLink}
-            className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-300 flex items-center gap-2 transition"
-          >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4 text-indigo-400" />}
-            {copied ? "Đã sao chép" : "Chia sẻ link"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowPDFModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/40 text-xs font-bold text-white flex items-center gap-1.5 transition shadow-sm"
+            >
+              <Printer className="w-4 h-4" />
+              In / Xuất PDF
+            </button>
+
+            <button
+              onClick={handleCopyLink}
+              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-300 flex items-center gap-2 transition"
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4 text-indigo-400" />}
+              {copied ? "Đã sao chép" : "Chia sẻ link"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -235,7 +303,7 @@ export default function ParentPortalPage() {
                   </div>
                   <h2 className="text-2xl font-bold text-white">{student.name}</h2>
                   <p className="text-sm text-slate-400 mt-1 flex items-center gap-2">
-                    Gia sư phụ trách: <span className="text-white font-medium">Gia sư Hoàng</span>
+                    Gia sư phụ trách: <span className="text-white font-medium">{tutorName}</span>
                   </p>
                 </div>
 
@@ -270,7 +338,7 @@ export default function ParentPortalPage() {
 
                 <div className="bg-white/5 p-4 rounded-xl border border-white/5 flex items-center justify-between">
                   <div>
-                    <span className="text-xs text-slate-400 block mb-0.5">Học phí đã học ({currentMonthStr})</span>
+                    <span className="text-xs text-slate-400 block mb-0.5">Học phí thực tế ({currentMonthStr})</span>
                     <span className="text-xl font-bold text-amber-400">{actualFee.toLocaleString()} VNĐ</span>
                     <span className="text-[10px] text-slate-400 block">(Dự kiến cả tháng: {projectedFee.toLocaleString()} VNĐ)</span>
                   </div>
@@ -280,11 +348,14 @@ export default function ParentPortalPage() {
                     className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
                   >
                     <QrCode className="w-4 h-4 text-amber-400" />
-                    Mã QR
+                    Mã QR Bank
                   </button>
                 </div>
               </div>
             </div>
+
+            {/* Recharts Student Progress Line Chart */}
+            <StudentProgressChart sessions={sessions} />
 
             {/* Learning Roadmap & Session History */}
             <div className="space-y-4">
@@ -318,15 +389,40 @@ export default function ParentPortalPage() {
                         </div>
                       </div>
 
-                      <span className={cn(
-                        "text-xs font-bold px-3 py-1 rounded-full border self-start sm:self-auto",
-                        session.status === "COMPLETED" 
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
-                          : "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                      )}>
-                        {session.status === "COMPLETED" ? "Đã Hoàn Thành" : "Sắp Diễn Ra"}
-                      </span>
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        {session.testScore !== undefined && (
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                            {session.testScore}/10
+                          </span>
+                        )}
+
+                        <span className={cn(
+                          "text-xs font-bold px-3 py-1 rounded-full border",
+                          session.status === "COMPLETED" 
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                            : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                        )}>
+                          {session.status === "COMPLETED" ? "Đã Hoàn Thành" : "Sắp Diễn Ra"}
+                        </span>
+
+                        {session.status !== "COMPLETED" && !session.rescheduleRequest && (
+                          <button
+                            onClick={() => setRescheduleSessionTarget(session)}
+                            className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-semibold transition"
+                          >
+                            Xin Nghỉ / Đổi Lịch
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {session.rescheduleRequest && (
+                      <div className="mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center justify-between">
+                        <span>⏳ Đã gửi yêu cầu đổi lịch: <strong>{session.rescheduleRequest.reason}</strong></span>
+                        <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full font-bold">Chờ Gia sư duyệt</span>
+                      </div>
+                    )}
 
                     {/* Session Feedback, Homework & File Attachment */}
                     {session.status === "COMPLETED" && (
