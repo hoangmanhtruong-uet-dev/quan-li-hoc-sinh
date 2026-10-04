@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { X, UserPlus, BookOpen, Phone, DollarSign, GraduationCap, Calendar, Clock, ArrowRight, Sparkles, Check, ArrowLeft, Trash2, Plus } from "lucide-react";
+import { X, UserPlus, BookOpen, Phone, DollarSign, GraduationCap, Calendar, Clock, ArrowRight, Sparkles, Check, ArrowLeft, Trash2, Plus, Upload, Paperclip } from "lucide-react";
 import { Student, Subject } from "@/types/database";
+import { uploadHomeworkFileToStorage } from "@/lib/storage";
 
 export interface RoadmapSessionConfig {
   date: string;
   dayOfWeek: string;
   time: string;
   topic: string;
+  homeworkFile?: { name: string; size: string; url: string } | null;
 }
 
 export interface NewStudentPayload extends Omit<Student, "id" | "createdAt"> {
@@ -74,12 +76,33 @@ export function AddStudentModal({ isOpen, onClose, onAddStudent }: AddStudentMod
 
   // Step 2 Roadmap States
   const [roadmapSessions, setRoadmapSessions] = useState<RoadmapSessionConfig[]>([]);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
 
   if (!isOpen) return null;
 
   const toggleDay = (day: string) => {
     setSelectedDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  };
+
+  const handleFileUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadingIndex(index);
+      const result = await uploadHomeworkFileToStorage(file);
+      if (result) {
+        setRoadmapSessions((prev) =>
+          prev.map((item, idx) => (idx === index ? { ...item, homeworkFile: result } : item))
+        );
+      }
+      setUploadingIndex(null);
+    }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setRoadmapSessions((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, homeworkFile: null } : item))
     );
   };
 
@@ -357,30 +380,60 @@ export function AddStudentModal({ isOpen, onClose, onAddStudent }: AddStudentMod
             </div>
 
             {/* Editable Roadmap List */}
-            <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+            <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
               {roadmapSessions.map((session, index) => (
-                <div key={index} className="p-3 rounded-xl bg-white/5 border border-white/5 hover:border-indigo-500/20 transition flex items-center gap-3">
-                  <span className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0">
+                <div key={index} className="p-3 rounded-xl bg-white/5 border border-white/5 hover:border-indigo-500/20 transition flex items-start gap-3">
+                  <span className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                     #{index + 1}
                   </span>
 
-                  <div className="w-28 shrink-0">
+                  <div className="w-28 shrink-0 mt-0.5">
                     <span className="text-xs font-semibold text-white block">{session.date}</span>
                     <span className="text-[10px] text-slate-400 block">{session.time}</span>
                   </div>
 
-                  <input
-                    type="text"
-                    value={session.topic}
-                    onChange={(e) => handleUpdateTopic(index, e.target.value)}
-                    placeholder="Nhập nội dung/chủ đề buổi học..."
-                    className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-indigo-500 font-medium"
-                  />
+                  <div className="flex-1 flex flex-col gap-2">
+                    <input
+                      type="text"
+                      value={session.topic}
+                      onChange={(e) => handleUpdateTopic(index, e.target.value)}
+                      placeholder="Nhập nội dung/chủ đề buổi học..."
+                      className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+
+                    {!session.homeworkFile ? (
+                      <label className="inline-flex items-center gap-1.5 text-[11px] text-purple-300 hover:text-purple-200 cursor-pointer w-fit bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 px-2.5 py-1 rounded-md transition">
+                        <Upload className="w-3 h-3 text-purple-400" />
+                        {uploadingIndex === index ? "Đang tải file lên..." : "Đính kèm file bài tập / tài liệu"}
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                          className="hidden"
+                          disabled={uploadingIndex === index}
+                          onChange={(e) => handleFileUpload(index, e)}
+                        />
+                      </label>
+                    ) : (
+                      <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 px-2.5 py-1 rounded-md text-[11px] text-purple-200 w-fit">
+                        <Paperclip className="w-3 h-3 text-purple-400 shrink-0" />
+                        <span className="truncate max-w-[180px] font-medium">{session.homeworkFile.name}</span>
+                        <span className="text-[9px] text-purple-300/70">({session.homeworkFile.size})</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFile(index)}
+                          className="text-red-400 hover:text-red-300 ml-1"
+                          title="Xóa file"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   <button
                     type="button"
                     onClick={() => handleRemoveSession(index)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition"
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition mt-0.5"
                     title="Xóa buổi học này"
                   >
                     <Trash2 className="w-4 h-4" />

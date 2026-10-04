@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { X, Save, Trash2, Plus, Calendar, Clock, BookOpen } from "lucide-react";
+import { X, Save, Trash2, Plus, Calendar, Clock, BookOpen, Upload, Paperclip } from "lucide-react";
 import { ClassSessionItem } from "./CheckInModal";
 import { Student } from "@/types/database";
+import { uploadHomeworkFileToStorage } from "@/lib/storage";
 
 interface EditRoadmapModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
   const [editingSessions, setEditingSessions] = useState<ClassSessionItem[]>([]);
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && student) {
@@ -27,9 +29,29 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
 
   if (!isOpen || !student) return null;
 
-  const handleUpdateSession = (id: string, field: keyof ClassSessionItem, value: string) => {
+  const handleUpdateSession = (id: string, field: keyof ClassSessionItem, value: any) => {
     setEditingSessions(prev => 
       prev.map(s => s.id === id ? { ...s, [field]: value } : s)
+    );
+  };
+
+  const handleFileUpload = async (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadingId(id);
+      const result = await uploadHomeworkFileToStorage(file);
+      if (result) {
+        setEditingSessions(prev =>
+          prev.map(s => s.id === id ? { ...s, homeworkFile: result } : s)
+        );
+      }
+      setUploadingId(null);
+    }
+  };
+
+  const handleRemoveFile = (id: string) => {
+    setEditingSessions(prev =>
+      prev.map(s => s.id === id ? { ...s, homeworkFile: null } : s)
     );
   };
 
@@ -94,7 +116,7 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
             </div>
           ) : (
             editingSessions.map((session, index) => (
-              <div key={session.id} className="flex flex-col md:flex-row gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
+              <div key={session.id} className="flex flex-col md:flex-row gap-4 bg-white/5 p-4 rounded-xl border border-white/10 items-start">
                 <div className="flex-1 space-y-2">
                   <label className="text-xs text-slate-400 font-semibold">Tên bài học</label>
                   <input
@@ -104,6 +126,40 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
                     className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
                     placeholder="VD: Cấu tạo nguyên tử"
                   />
+                  {!session.homeworkFile ? (
+                    <label className="inline-flex items-center gap-1.5 text-xs text-purple-300 hover:text-purple-200 cursor-pointer w-fit bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 px-2.5 py-1 rounded-md transition mt-1">
+                      <Upload className="w-3.5 h-3.5 text-purple-400" />
+                      {uploadingId === session.id ? "Đang tải file lên..." : "Đính kèm file bài tập / tài liệu"}
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                        className="hidden"
+                        disabled={uploadingId === session.id}
+                        onChange={(e) => handleFileUpload(session.id, e)}
+                      />
+                    </label>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 px-2.5 py-1 rounded-md text-xs text-purple-200 w-fit mt-1">
+                      <Paperclip className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                      <a 
+                        href={session.homeworkFile.url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="truncate max-w-[200px] font-medium hover:underline text-purple-300"
+                      >
+                        {session.homeworkFile.name}
+                      </a>
+                      <span className="text-[10px] text-purple-300/70">({session.homeworkFile.size})</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile(session.id)}
+                        className="text-red-400 hover:text-red-300 ml-1"
+                        title="Xóa file"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="w-full md:w-40 space-y-2">
@@ -134,7 +190,7 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
                   </div>
                 </div>
 
-                <div className="flex items-end pb-1">
+                <div className="flex items-end pt-6">
                   <button
                     onClick={() => handleDeleteSession(session.id)}
                     className="p-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg border border-red-500/20 transition"

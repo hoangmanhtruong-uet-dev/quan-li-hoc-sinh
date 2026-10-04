@@ -119,6 +119,9 @@ export async function insertStudentWithRoadmapToDB(payload: NewStudentPayload): 
       month: getCurrentMonthStr(),
       time: s.time,
       status: "SCHEDULED",
+      homework_file_name: s.homeworkFile?.name || null,
+      homework_file_url: s.homeworkFile?.url || null,
+      homework_file_size: s.homeworkFile?.size || null,
     }));
 
     const { data: sessionsData, error: sessionsErr } = await supabase
@@ -263,6 +266,9 @@ export async function updateRoadmapSessionsInDB(updatedSessions: ClassSessionIte
         date: s.date,
         time: s.time,
         status: s.status,
+        homework_file_name: s.homeworkFile?.name || null,
+        homework_file_url: s.homeworkFile?.url || null,
+        homework_file_size: s.homeworkFile?.size || null,
       };
       
       // If it's an existing session, we pass the UUID
