@@ -33,23 +33,29 @@ import {
   Send,
   Filter,
   X,
-  QrCode
+  QrCode,
+  LogOut
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getCurrentMonthStr } from "@/lib/utils";
 import { AddStudentModal, NewStudentPayload } from "@/components/AddStudentModal";
 import { CheckInModal, ClassSessionItem } from "@/components/CheckInModal";
 import { ZaloReceiptModal } from "@/components/ZaloReceiptModal";
+import { EditRoadmapModal } from "@/components/EditRoadmapModal";
 import { Student } from "@/types/database";
 import { 
   fetchStudentsFromDB, 
   fetchSessionsFromDB, 
   insertStudentWithRoadmapToDB, 
   updateSessionCheckInInDB,
-  deleteStudentFromDB
+  deleteStudentFromDB,
+  processRescheduleRequest,
+  updateRoadmapSessionsInDB
 } from "@/lib/db";
 import Link from "next/link";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
-const currentMonthStr = "Tháng 10/2026";
+const currentMonthStr = getCurrentMonthStr();
 
 const subjectColorMap: Record<string, { bg: string; text: string; border: string }> = {
   "Hóa học": { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/20" },
@@ -68,8 +74,10 @@ const getSubjectIcon = (subject: string) => {
 type ActiveTab = "overview" | "schedule" | "students" | "tuition";
 
 export default function Dashboard() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<ClassSessionItem | null>(null);
   
   // Real Database State
@@ -90,13 +98,23 @@ export default function Dashboard() {
   // Zalo & VietQR Modal State
   const [selectedZaloStudent, setSelectedZaloStudent] = useState<Student | null>(null);
 
+  // Edit Roadmap State
+  const [isEditRoadmapOpen, setIsEditRoadmapOpen] = useState(false);
+  const [selectedRoadmapStudent, setSelectedRoadmapStudent] = useState<Student | null>(null);
+
   // Reschedule Requests Drawer State
   const [showRescheduleDrawer, setShowRescheduleDrawer] = useState(false);
 
-  // Load Real Data from Supabase DB on startup
+  // Load Real Data from Supabase DB on startup + get current user
   useEffect(() => {
     async function loadDBData() {
       setLoading(true);
+
+      // Get logged-in user email
+      const supabase = createSupabaseBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) setUserEmail(user.email);
+
       const dbStudents = await fetchStudentsFromDB();
       const dbSessions = await fetchSessionsFromDB();
 
@@ -106,18 +124,6 @@ export default function Dashboard() {
         ...s,
         icon: getSubjectIcon(s.subject),
       }));
-
-      // Add demo pending reschedule request for interactive testing if none exist
-      if (mappedSessions.length > 0 && !mappedSessions.some((s) => s.rescheduleRequest)) {
-        mappedSessions[0].rescheduleRequest = {
-          id: "req-demo-1",
-          reason: "Con bị trùng lịch thi giữa kỳ ở trường",
-          proposedDate: "2026-10-18",
-          proposedTime: "19h30 - 21h30",
-          status: "PENDING",
-          createdAt: new Date().toISOString(),
-        };
-      }
 
       setUpcomingClasses(mappedSessions);
       setLoading(false);
@@ -129,10 +135,16 @@ export default function Dashboard() {
     (c) => c.rescheduleRequest && c.rescheduleRequest.status === "PENDING"
   ).length;
 
-  const handleApproveReschedule = (session: ClassSessionItem) => {
+  const handleApproveReschedule = async (session: ClassSessionItem) => {
     if (!session.rescheduleRequest) return;
     const newDate = session.rescheduleRequest.proposedDate || session.date;
     const newTime = session.rescheduleRequest.proposedTime || session.time;
+
+    const success = await processRescheduleRequest(session.id, true, "SCHEDULED");
+    if (!success) {
+      alert("Lỗi cập nhật lịch. Vui lòng thử lại.");
+      return;
+    }
 
     setUpcomingClasses((prev) =>
       prev.map((item) => {
@@ -153,8 +165,15 @@ export default function Dashboard() {
     );
   };
 
-  const handleRejectReschedule = (session: ClassSessionItem) => {
+  const handleRejectReschedule = async (session: ClassSessionItem) => {
     if (!session.rescheduleRequest) return;
+    
+    const success = await processRescheduleRequest(session.id, false);
+    if (!success) {
+      alert("Lỗi cập nhật. Vui lòng thử lại.");
+      return;
+    }
+
     setUpcomingClasses((prev) =>
       prev.map((item) => {
         if (item.id === session.id) {
@@ -190,6 +209,28 @@ export default function Dashboard() {
     await updateSessionCheckInInDB(updatedSession);
   };
 
+  // Save Roadmap
+  const handleSaveRoadmap = async (updatedSessions: ClassSessionItem[], deletedSessionIds: string[]) => {
+    const success = await updateRoadmapSessionsInDB(updatedSessions, deletedSessionIds);
+    if (success) {
+      // Update local state
+      setUpcomingClasses((prev) => {
+        // Remove deleted
+        let newClasses = prev.filter(c => !deletedSessionIds.includes(c.id));
+        // Update or insert edited ones
+        // First filter out all edited ones from newClasses to avoid duplicates
+        const updatedIds = updatedSessions.map(s => s.id);
+        newClasses = newClasses.filter(c => !updatedIds.includes(c.id));
+        // Push the updated ones
+        newClasses = [...newClasses, ...updatedSessions];
+        // Note: New sessions have 'new-' IDs temporarily until reload, which is fine for UI
+        return newClasses;
+      });
+    } else {
+      alert("Đã xảy ra lỗi khi cập nhật lộ trình. Vui lòng thử lại!");
+    }
+  };
+
   // Delete Student
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
     if (confirm(`Bạn có chắc chắn muốn xóa học sinh "${studentName}" và toàn bộ lộ trình?`)) {
@@ -200,10 +241,10 @@ export default function Dashboard() {
   };
 
   // Copy Magic Link for Parent
-  const handleCopyMagicLink = (studentId: string, studentName: string) => {
-    const link = `${window.location.origin}/p/${studentId}`;
+  const handleCopyMagicLink = (tokenOrId: string, studentName: string) => {
+    const link = `${window.location.origin}/p/${tokenOrId}`;
     navigator.clipboard.writeText(link);
-    setCopiedToken(studentId);
+    setCopiedToken(tokenOrId);
     setTimeout(() => setCopiedToken(null), 2000);
   };
 
@@ -253,6 +294,17 @@ export default function Dashboard() {
         isOpen={isAddStudentOpen}
         onClose={() => setIsAddStudentOpen(false)}
         onAddStudent={handleAddStudent}
+      />
+
+      <EditRoadmapModal
+        isOpen={isEditRoadmapOpen}
+        student={selectedRoadmapStudent}
+        sessions={selectedRoadmapStudent ? upcomingClasses.filter(c => c.student === selectedRoadmapStudent.name) : []}
+        onClose={() => {
+          setIsEditRoadmapOpen(false);
+          setSelectedRoadmapStudent(null);
+        }}
+        onSave={handleSaveRoadmap}
       />
 
       <CheckInModal
@@ -387,14 +439,28 @@ export default function Dashboard() {
           ))}
         </nav>
 
-        <div className="p-3 m-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-xs text-white shadow-sm">
-            GS
+        <div className="p-3 m-3 rounded-xl bg-white/5 border border-white/5 space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-xs text-white shadow-sm">
+              GS
+            </div>
+            <div className="overflow-hidden flex-1">
+              <p className="text-xs font-semibold text-white truncate">Gia Sư</p>
+              <p className="text-[10px] text-slate-400 truncate">{userEmail || "Đang tải..."}</p>
+            </div>
           </div>
-          <div className="overflow-hidden">
-            <p className="text-xs font-semibold text-white truncate">Gia Sư Chuyên Nghiệp</p>
-            <p className="text-[10px] text-slate-400 truncate">giasu@tutortrack.edu.vn</p>
-          </div>
+          <button
+            onClick={async () => {
+              const supabase = createSupabaseBrowserClient();
+              await supabase.auth.signOut();
+              router.push("/login");
+              router.refresh();
+            }}
+            className="w-full px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Đăng Xuất
+          </button>
         </div>
       </aside>
 
@@ -884,7 +950,18 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <div className="pt-2">
+                  <div className="pt-2 space-y-2">
+                    <button
+                      onClick={() => {
+                        setSelectedRoadmapStudent(st);
+                        setIsEditRoadmapOpen(true);
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold flex items-center justify-center gap-2 transition"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      Sửa Lộ Trình Học
+                    </button>
+
                     <button
                       onClick={() => handleCopyMagicLink(st.magicToken || st.id, st.name)}
                       className="w-full py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center justify-center gap-2 transition"

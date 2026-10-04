@@ -3,6 +3,7 @@
 import { X, Printer, GraduationCap, CheckCircle2, Calendar, Award } from "lucide-react";
 import { Student } from "@/types/database";
 import { ClassSessionItem } from "./CheckInModal";
+import { getCurrentMonthStr } from "@/lib/utils";
 
 interface PrintableReportModalProps {
   isOpen: boolean;
@@ -58,7 +59,7 @@ export function PrintableReportModal({ isOpen, student, sessions, onClose }: Pri
           <div className="flex justify-between items-start border-b-2 border-indigo-900 pb-4">
             <div>
               <h2 className="text-xl font-bold uppercase tracking-tight text-indigo-950">TUTORTRACK EDUCATION</h2>
-              <p className="text-xs text-slate-600">Báo Cáo Tình Hình Học Tập & Học Phí Tháng 10/2026</p>
+              <p className="text-xs text-slate-600">Báo Cáo Tình Hình Học Tập & Học Phí {getCurrentMonthStr()}</p>
             </div>
             <div className="text-right">
               <span className="text-xs font-bold text-indigo-900 block">Gia Sư: HOANG MANH TRUONG</span>

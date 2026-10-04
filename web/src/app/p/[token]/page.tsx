@@ -21,8 +21,8 @@ import {
   Printer,
   Trophy
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { fetchStudentsFromDB, fetchSessionsFromDB } from "@/lib/db";
+import { cn, getCurrentMonthStr } from "@/lib/utils";
+import { fetchStudentsFromDB, fetchSessionsFromDB, submitRescheduleRequest, submitParentFeedback } from "@/lib/db";
 import { Student } from "@/types/database";
 import { ClassSessionItem } from "@/components/CheckInModal";
 import { StudentProgressChart } from "@/components/StudentProgressChart";
@@ -59,8 +59,8 @@ export default function ParentPortalPage() {
       const allStudents = await fetchStudentsFromDB();
       const allSessions = await fetchSessionsFromDB();
 
-      // Find student matching token or id
-      const matchedStudent = allStudents.find((s) => s.id === token || s.magicToken === token) || allStudents[0] || null;
+      // Find student matching token — NEVER fall back to another student
+      const matchedStudent = allStudents.find((s) => s.id === token || s.magicToken === token) || null;
       setStudent(matchedStudent);
 
       if (matchedStudent) {
@@ -78,9 +78,16 @@ export default function ParentPortalPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSendFeedback = (e: React.FormEvent) => {
+  const handleSendFeedback = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!parentNote.trim()) return;
+    if (!parentNote.trim() || !student) return;
+    
+    const success = await submitParentFeedback(student.id, parentNote);
+    if (!success) {
+      alert("Lỗi khi gửi lời nhắn. Vui lòng thử lại.");
+      return;
+    }
+
     setFeedbackSent(true);
     setTimeout(() => {
       setFeedbackSent(false);
@@ -89,29 +96,37 @@ export default function ParentPortalPage() {
     }, 2000);
   };
 
-  const handleRescheduleSubmit = (sessionId: string, reason: string, proposedDate?: string, proposedTime?: string) => {
-    setSessions((prev) =>
-      prev.map((s) => {
-        if (s.id === sessionId) {
-          return {
-            ...s,
-            rescheduleRequest: {
-              id: `req-${Date.now()}`,
-              reason,
-              proposedDate,
-              proposedTime,
-              status: "PENDING",
-              createdAt: new Date().toISOString(),
-            },
-          };
-        }
-        return s;
-      })
-    );
+  const handleRescheduleSubmit = async (sessionId: string, reason: string, proposedDate?: string, proposedTime?: string) => {
+    const requestPayload = {
+      id: `req-${Date.now()}`,
+      reason,
+      proposedDate,
+      proposedTime,
+      status: "PENDING",
+      createdAt: new Date().toISOString(),
+    };
+
+    const success = await submitRescheduleRequest(sessionId, requestPayload);
+    
+    if (success) {
+      setSessions((prev) =>
+        prev.map((s) => {
+          if (s.id === sessionId) {
+            return {
+              ...s,
+              rescheduleRequest: requestPayload as any,
+            };
+          }
+          return s;
+        })
+      );
+    } else {
+      alert("Đã xảy ra lỗi khi gửi yêu cầu đổi lịch. Vui lòng thử lại sau.");
+    }
   };
 
   const completedSessionsCount = sessions.filter((s) => s.status === "COMPLETED").length;
-  const currentMonthStr = "Tháng 10/2026";
+  const currentMonthStr = getCurrentMonthStr();
   const hourlyRate = student?.hourlyRate || 200000;
   const actualFee = completedSessionsCount * hourlyRate;
   const projectedFee = (sessions.length || 8) * hourlyRate;
@@ -286,6 +301,19 @@ export default function ParentPortalPage() {
         {loading && (
           <div className="glass p-12 text-center rounded-2xl border border-white/5">
             <span className="text-xs text-indigo-400 font-semibold animate-pulse">Đang tải sổ học tập của con...</span>
+          </div>
+        )}
+
+        {!loading && !student && (
+          <div className="glass p-12 text-center rounded-2xl border border-red-500/20 space-y-3">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto">
+              <X className="w-8 h-8 text-red-400" />
+            </div>
+            <h3 className="text-lg font-bold text-white">Không tìm thấy Sổ Học Tập</h3>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+              Đường link không hợp lệ hoặc đã hết hạn. Vui lòng liên hệ Gia sư để nhận link mới, 
+              hoặc sử dụng trang <a href="/lookup" className="text-indigo-400 hover:underline font-semibold">Tra Cứu bằng SĐT</a>.
+            </p>
           </div>
         )}
 

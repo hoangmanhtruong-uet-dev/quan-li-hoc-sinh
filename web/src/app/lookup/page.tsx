@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { GraduationCap, Phone, Search, ArrowRight, Sparkles, BookOpen, ChevronRight } from "lucide-react";
-import { fetchStudentsFromDB } from "@/lib/db";
+import { fetchStudentsByPhoneFromDB } from "@/lib/db";
 import { Student } from "@/types/database";
 import Link from "next/link";
 
@@ -19,10 +19,13 @@ export default function ParentLookupPage() {
     setLoading(true);
     setHasSearched(true);
 
-    const allStudents = await fetchStudentsFromDB();
-    const matches = allStudents.filter(
-      (s) => s.parentPhone && s.parentPhone.replace(/\D/g, "").includes(phone.replace(/\D/g, ""))
-    );
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (!cleanPhone) {
+      setLoading(false);
+      return;
+    }
+
+    const matches = await fetchStudentsByPhoneFromDB(cleanPhone);
 
     setFoundStudents(matches);
     setLoading(false);

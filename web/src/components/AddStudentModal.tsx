@@ -339,7 +339,7 @@ export function AddStudentModal({ isOpen, onClose, onAddStudent }: AddStudentMod
               <div>
                 <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-indigo-400" />
-                  Đã tự động tạo kế hoạch {roadmapSessions.length} buổi học cho tháng 10/2026
+                  Đã tự động tạo kế hoạch {roadmapSessions.length} buổi học
                 </span>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   Học sinh: <span className="text-white font-medium">{name}</span> • Môn {subject} ({grade})
