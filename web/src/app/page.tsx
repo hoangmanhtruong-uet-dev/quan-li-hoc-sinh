@@ -197,6 +197,8 @@ export default function Dashboard() {
     if (result) {
       setStudents((prev) => [result.student, ...prev]);
       setUpcomingClasses((prev) => [...result.sessions, ...prev]);
+    } else {
+      alert("Lỗi khi thêm học sinh! Vui lòng kiểm tra quyền RLS (INSERT Policy) trên Supabase cho cả 2 bảng `students` và `class_sessions`.");
     }
   };
 
@@ -234,9 +236,13 @@ export default function Dashboard() {
   // Delete Student
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
     if (confirm(`Bạn có chắc chắn muốn xóa học sinh "${studentName}" và toàn bộ lộ trình?`)) {
-      setStudents((prev) => prev.filter((s) => s.id !== studentId));
-      setUpcomingClasses((prev) => prev.filter((c) => c.student !== studentName));
-      await deleteStudentFromDB(studentId);
+      const success = await deleteStudentFromDB(studentId);
+      if (success) {
+        setStudents((prev) => prev.filter((s) => s.id !== studentId));
+        setUpcomingClasses((prev) => prev.filter((c) => c.student !== studentName));
+      } else {
+        alert("Không thể xóa học sinh trong Database. Vui lòng kiểm tra lại quyền RLS (Delete Policy) trên Supabase.");
+      }
     }
   };
 

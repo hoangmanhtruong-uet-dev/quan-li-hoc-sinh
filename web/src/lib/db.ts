@@ -63,29 +63,32 @@ export async function fetchStudentsByPhoneFromDB(phone: string): Promise<Student
 
 export async function insertStudentWithRoadmapToDB(payload: NewStudentPayload): Promise<{ student: Student; sessions: ClassSessionItem[] } | null> {
   try {
-    const { data: authData } = await supabase.auth.getUser();
-    const tutorId = authData.user?.id;
-
-    if (!tutorId) {
-      console.error("User not authenticated");
-      return null;
+    // Try to get tutor_id if logged in, but don't require it (single-tutor mode)
+    let tutorId: string | null = null;
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      tutorId = authData.user?.id || null;
+    } catch {
+      // Not logged in - that's OK for single-tutor mode
     }
 
     // 1. Insert Student
+    const insertData: any = {
+      name: payload.name,
+      grade: payload.grade,
+      subject: payload.subject,
+      parent_phone: payload.parentPhone,
+      hourly_rate: payload.hourlyRate,
+      schedule_days: payload.scheduleDays.join(", "),
+      schedule_time: payload.scheduleTime,
+    };
+    if (tutorId) {
+      insertData.tutor_id = tutorId;
+    }
+
     const { data: studentData, error: studentErr } = await supabase
       .from("students")
-      .insert([
-        {
-          name: payload.name,
-          grade: payload.grade,
-          subject: payload.subject,
-          parent_phone: payload.parentPhone,
-          hourly_rate: payload.hourlyRate,
-          tutor_id: tutorId,
-          schedule_days: payload.scheduleDays.join(", "),
-          schedule_time: payload.scheduleTime,
-        },
-      ])
+      .insert([insertData])
       .select()
       .single();
 

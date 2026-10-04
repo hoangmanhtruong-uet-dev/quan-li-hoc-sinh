@@ -58,7 +58,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // --- Authentication guard for Admin routes ---
-  if (!isPublicRoute(pathname) && pathname !== "/") {
+  if (!isPublicRoute(pathname)) {
     // Non-public route: require authentication
     if (!user) {
       const loginUrl = new URL("/login", request.url);
