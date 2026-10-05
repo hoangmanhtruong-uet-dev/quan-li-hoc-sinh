@@ -57,7 +57,9 @@ import {
   updateStudentInDB,
   fetchParentMessagesFromDB,
   insertMultipleSessionsToDB,
-  ParentMessageItem
+  ParentMessageItem,
+  fetchMonthlyOutlinesFromDB,
+  MonthlyOutlineItem
 } from "@/lib/db";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -92,9 +94,11 @@ export default function Dashboard() {
   const { data: dbStudents, mutate: mutateStudents } = useSWR('students', fetchStudentsFromDB, { revalidateOnFocus: false });
   const { data: dbSessions, mutate: mutateSessions } = useSWR('sessions', fetchSessionsFromDB, { revalidateOnFocus: false });
   const { data: dbMessages, mutate: mutateMessages } = useSWR('parent_messages', fetchParentMessagesFromDB, { revalidateOnFocus: false });
+  const { data: dbOutlines, mutate: mutateOutlines } = useSWR('monthly_outlines', fetchMonthlyOutlinesFromDB, { revalidateOnFocus: false });
 
   const students = dbStudents || [];
   const parentMessages = dbMessages || [];
+  const monthlyOutlines = dbOutlines || [];
   const upcomingClasses = (dbSessions || []).map((s) => ({
     ...s,
     icon: getSubjectIcon(s.subject),
@@ -198,6 +202,13 @@ export default function Dashboard() {
         { event: '*', schema: 'public', table: 'students' },
         () => {
           mutateStudents(undefined, { revalidate: true });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'monthly_outlines' },
+        () => {
+          mutateOutlines(undefined, { revalidate: true });
         }
       )
       .subscribe();
@@ -413,6 +424,8 @@ export default function Dashboard() {
         isOpen={isEditRoadmapOpen}
         student={selectedRoadmapStudent}
         sessions={selectedRoadmapStudent ? upcomingClasses.filter(c => c.student === selectedRoadmapStudent.name) : []}
+        monthlyOutlines={selectedRoadmapStudent ? monthlyOutlines.filter(o => o.studentId === selectedRoadmapStudent.id) : []}
+        onMutateOutlines={() => mutateOutlines()}
         onClose={() => {
           setIsEditRoadmapOpen(false);
           setSelectedRoadmapStudent(null);

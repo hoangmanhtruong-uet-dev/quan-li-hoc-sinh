@@ -13,6 +13,13 @@ export interface RescheduleRequest {
   createdAt: string;
 }
 
+export interface StudentHomeworkFile {
+  name: string;
+  size: string;
+  url: string;
+  submittedAt: string;
+}
+
 export interface ClassSessionItem {
   id: string;
   student: string;
@@ -30,6 +37,7 @@ export interface ClassSessionItem {
   testScore?: number; // Thang điểm 10
   icon?: any;
   rescheduleRequest?: RescheduleRequest | null;
+  studentHomeworkFile?: StudentHomeworkFile | null;
 }
 
 interface CheckInModalProps {
@@ -246,6 +254,32 @@ export function CheckInModal({ isOpen, session, onClose, onSaveSession }: CheckI
               />
             </label>
           </div>
+
+          {session.studentHomeworkFile && (
+            <div className="bg-emerald-950/30 p-3.5 rounded-xl border border-emerald-500/20 mt-2">
+              <label className="text-xs font-bold text-emerald-300 flex items-center gap-1.5 mb-2">
+                <FileCheck className="w-4 h-4 text-emerald-400" />
+                Học sinh đã nộp bài tập:
+              </label>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <Paperclip className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <a 
+                    href={session.studentHomeworkFile.url} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="text-emerald-200 font-medium truncate hover:underline"
+                  >
+                    {session.studentHomeworkFile.name}
+                  </a>
+                  <span className="text-[10px] text-emerald-300/80 shrink-0">({session.studentHomeworkFile.size})</span>
+                </div>
+                <div className="text-[10px] text-emerald-400/80 shrink-0">
+                  {new Date(session.studentHomeworkFile.submittedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="pt-2 flex gap-3">
             <button

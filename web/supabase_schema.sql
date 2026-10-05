@@ -217,3 +217,46 @@ CREATE POLICY "Public Delete Access for homework-files"
   USING (bucket_id = 'homework-files');
 
 
+
+-- ===============================================
+-- 8. C?P NH?T TÍNH NÃNG Ð? CÝÕNG & BÀI T?P (V2)
+-- ===============================================
+
+CREATE TABLE IF NOT EXISTS public.monthly_outlines (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id UUID REFERENCES public.students(id) ON DELETE CASCADE NOT NULL,
+    month TEXT NOT NULL,
+    file_name TEXT,
+    file_url TEXT,
+    file_size TEXT,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_monthly_outlines_student_month ON public.monthly_outlines (student_id, month);
+
+ALTER TABLE public.monthly_outlines ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS ""Tutor full CRUD on monthly outlines"" ON public.monthly_outlines;
+CREATE POLICY ""Tutor full CRUD on monthly outlines""
+  ON public.monthly_outlines FOR ALL
+  TO authenticated
+  USING (student_id IN (SELECT id FROM public.students WHERE tutor_id IS NULL OR tutor_id = auth.uid()))
+  WITH CHECK (student_id IN (SELECT id FROM public.students WHERE tutor_id IS NULL OR tutor_id = auth.uid()));
+
+DROP POLICY IF EXISTS ""Anon read monthly outlines"" ON public.monthly_outlines;
+CREATE POLICY ""Anon read monthly outlines""
+  ON public.monthly_outlines FOR SELECT
+  TO anon
+  USING (student_id IN (SELECT id FROM public.students WHERE magic_token IS NOT NULL));
+
+ALTER TABLE public.class_sessions ADD COLUMN IF NOT EXISTS student_homework_file_name TEXT;
+ALTER TABLE public.class_sessions ADD COLUMN IF NOT EXISTS student_homework_file_url TEXT;
+ALTER TABLE public.class_sessions ADD COLUMN IF NOT EXISTS student_homework_file_size TEXT;
+ALTER TABLE public.class_sessions ADD COLUMN IF NOT EXISTS student_homework_submitted_at TIMESTAMPTZ;
+
+DROP POLICY IF EXISTS ""Anon update sessions for homework"" ON public.class_sessions;
+CREATE POLICY ""Anon update sessions for homework""
+  ON public.class_sessions FOR UPDATE
+  TO anon
+  USING (student_id IN (SELECT id FROM public.students WHERE magic_token IS NOT NULL))
+  WITH CHECK (student_id IN (SELECT id FROM public.students WHERE magic_token IS NOT NULL));

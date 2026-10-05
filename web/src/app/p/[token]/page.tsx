@@ -21,10 +21,11 @@ import {
   MessageSquare,
   X,
   Printer,
-  Trophy
+  Trophy,
+  BookOpen
 } from "lucide-react";
 import { cn, getCurrentMonthStr, getUpcomingMonthOptions } from "@/lib/utils";
-import { fetchStudentsFromDB, fetchSessionsFromDB, submitRescheduleRequest, submitParentFeedback } from "@/lib/db";
+import { fetchStudentsFromDB, fetchSessionsFromDB, submitRescheduleRequest, submitParentFeedback, submitStudentHomeworkToDB, fetchMonthlyOutlinesFromDB, MonthlyOutlineItem } from "@/lib/db";
 import { Student } from "@/types/database";
 import { ClassSessionItem } from "@/components/CheckInModal";
 import { StudentProgressChart } from "@/components/StudentProgressChart";
@@ -32,7 +33,8 @@ import { PrintableReportModal } from "@/components/PrintableReportModal";
 import { RescheduleModal } from "@/components/RescheduleModal";
 import { useParams } from "next/navigation";
 
-import { handleDownloadFile } from "@/lib/storage";
+import { handleDownloadFile, uploadHomeworkFilesToStorage } from "@/lib/storage";
+import { Upload } from "lucide-react";
 
 export default function ParentPortalPage() {
   const params = useParams();
@@ -41,10 +43,12 @@ export default function ParentPortalPage() {
   const [copied, setCopied] = useState(false);
   const { data: allStudents, mutate: mutateStudents } = useSWR<Student[]>('students', fetchStudentsFromDB, { revalidateOnFocus: false });
   const { data: allSessions, mutate: mutateSessions } = useSWR<ClassSessionItem[]>('sessions', fetchSessionsFromDB, { revalidateOnFocus: false });
+  const { data: allOutlines } = useSWR<MonthlyOutlineItem[]>('monthly_outlines', fetchMonthlyOutlinesFromDB, { revalidateOnFocus: false });
 
   const student = (allStudents || []).find((s) => s.id === token || s.magicToken === token) || null;
   const sessions = student ? (allSessions || []).filter((cs) => cs.student === student.name) : [];
-  const loading = !allStudents || !allSessions;
+  const monthlyOutlines = student ? (allOutlines || []).filter((o) => o.studentId === student.id) : [];
+  const loading = !allStudents || !allSessions || !allOutlines;
 
   // VietQR Modal State
   const [showQRModal, setShowQRModal] = useState(false);
@@ -62,6 +66,55 @@ export default function ParentPortalPage() {
 
   // Session Detail Modal State for Parent
   const [selectedDetailSession, setSelectedDetailSession] = useState<ClassSessionItem | null>(null);
+
+  // Homework submission state
+  const [uploadingHomeworkFor, setUploadingHomeworkFor] = useState<string | null>(null);
+
+  const handleStudentHomeworkUpload = async (sessionId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingHomeworkFor(sessionId);
+    try {
+      const results = await uploadHomeworkFilesToStorage(files);
+      if (results.length > 0) {
+        const file = results[0];
+        const success = await submitStudentHomeworkToDB(sessionId, file.name, file.url, file.size);
+        if (success) {
+          mutateSessions((prev = []) =>
+            prev.map((s) => {
+              if (s.id === sessionId) {
+                const updatedSession = {
+                  ...s,
+                  studentHomeworkFile: {
+                    name: file.name,
+                    size: file.size,
+                    url: file.url,
+                    submittedAt: new Date().toISOString(),
+                  },
+                };
+                // Update selected detail session if it's the current one
+                if (selectedDetailSession?.id === sessionId) {
+                  setSelectedDetailSession(updatedSession);
+                }
+                return updatedSession;
+              }
+              return s;
+            })
+          , { revalidate: false });
+          alert("Nộp bài tập thành công!");
+        } else {
+          alert("Lỗi khi nộp bài tập. Vui lòng thử lại.");
+        }
+      }
+    } catch (err) {
+      console.error("Error uploading homework:", err);
+      alert("Đã xảy ra lỗi khi tải file lên.");
+    } finally {
+      setUploadingHomeworkFor(null);
+      e.target.value = "";
+    }
+  };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -121,7 +174,8 @@ export default function ParentPortalPage() {
 
   const upcoming5Months = getUpcomingMonthOptions(5);
   const sessionMonths = sessions.map((s) => s.month).filter(Boolean);
-  const availableMonths = Array.from(new Set([...upcoming5Months, ...sessionMonths])).sort((a, b) => {
+  const outlineMonths = monthlyOutlines.map((o) => o.month).filter(Boolean);
+  const availableMonths = Array.from(new Set([...upcoming5Months, ...sessionMonths, ...outlineMonths])).sort((a, b) => {
     const parseMonth = (str: string) => {
       const parts = str.replace("Tháng ", "").split("/");
       return { m: parseInt(parts[0], 10), y: parseInt(parts[1], 10) };
@@ -291,6 +345,63 @@ export default function ParentPortalPage() {
                   </div>
                 );
               })()}
+            </div>
+
+            {/* Student Homework Submission */}
+            <div className="pt-2 border-t border-white/5">
+              <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5 mb-2">
+                <Upload className="w-4 h-4 text-emerald-400" />
+                Nộp bài tập cho Gia sư:
+              </span>
+              
+              {selectedDetailSession.studentHomeworkFile ? (
+                <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/30 text-xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Đã nộp bài tập
+                    </span>
+                    <span className="text-[10px] text-emerald-300/80">
+                      {new Date(selectedDetailSession.studentHomeworkFile.submittedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 overflow-hidden bg-emerald-950/40 p-2 rounded-lg border border-emerald-500/20">
+                    <Paperclip className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <a 
+                      href={selectedDetailSession.studentHomeworkFile.url} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="text-emerald-200 font-medium truncate hover:underline"
+                    >
+                      {selectedDetailSession.studentHomeworkFile.name}
+                    </a>
+                    <span className="text-[10px] text-emerald-300/80 shrink-0">({selectedDetailSession.studentHomeworkFile.size})</span>
+                  </div>
+                  
+                  <label className="mt-2 flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 cursor-pointer transition text-[11px] font-semibold w-full text-center">
+                    {uploadingHomeworkFor === selectedDetailSession.id ? "Đang tải lên..." : "Nộp lại bài khác"}
+                    <input 
+                      type="file"
+                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
+                      className="hidden"
+                      onChange={(e) => handleStudentHomeworkUpload(selectedDetailSession.id, e)}
+                      disabled={uploadingHomeworkFor === selectedDetailSession.id}
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 cursor-pointer transition text-xs font-semibold text-emerald-300 w-full text-center">
+                  <Upload className="w-4 h-4 text-emerald-400" />
+                  {uploadingHomeworkFor === selectedDetailSession.id ? "Đang tải bài tập lên..." : "Chọn file nộp bài (<= 10MB)"}
+                  <input 
+                    type="file"
+                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
+                    className="hidden"
+                    onChange={(e) => handleStudentHomeworkUpload(selectedDetailSession.id, e)}
+                    disabled={uploadingHomeworkFor === selectedDetailSession.id}
+                  />
+                </label>
+              )}
             </div>
 
             {/* Footer Buttons */}
@@ -595,6 +706,36 @@ export default function ParentPortalPage() {
                   </div>
                 )}
               </div>
+
+              {selectedMonth !== "ALL" && monthlyOutlines.filter(o => o.month === selectedMonth).length > 0 && (
+                <div className="bg-emerald-950/40 p-4 rounded-2xl border border-emerald-500/30">
+                  <h4 className="text-sm font-bold text-emerald-400 flex items-center gap-1.5 mb-3">
+                    <BookOpen className="w-4 h-4" />
+                    Đề Cương Ôn Tập ({selectedMonth})
+                  </h4>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {monthlyOutlines.filter(o => o.month === selectedMonth).map(outline => (
+                      <div key={outline.id} className="flex items-center justify-between gap-3 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 flex-1">
+                        <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                          <Paperclip className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <span className="text-white font-semibold block truncate text-xs">{outline.fileName}</span>
+                            <span className="text-[10px] text-emerald-300/70 block">Dung lượng: {outline.fileSize}</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadFile(outline.fileUrl, outline.fileName)}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Tải Về
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4">
                 {displayedSessions.length === 0 ? (

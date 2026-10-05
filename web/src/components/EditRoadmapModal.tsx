@@ -3,23 +3,26 @@ import { X, Save, Trash2, Plus, Calendar, Clock, BookOpen, Upload, Paperclip, Ar
 import { ClassSessionItem } from "./CheckInModal";
 import { Student } from "@/types/database";
 import { uploadHomeworkFilesToStorage } from "@/lib/storage";
-import { parseSessionDateWeight } from "@/lib/db";
+import { insertMonthlyOutlineToDB, deleteMonthlyOutlineToDB, MonthlyOutlineItem } from "@/lib/db";
 import { generateDatesForMonth, getCurrentMonthStr, getUpcomingMonthOptions, cn } from "@/lib/utils";
 
 interface EditRoadmapModalProps {
   isOpen: boolean;
   student: Student | null;
   sessions: ClassSessionItem[];
+  monthlyOutlines?: MonthlyOutlineItem[];
+  onMutateOutlines?: () => void;
   onClose: () => void;
   onSave: (updatedSessions: ClassSessionItem[], deletedSessionIds: string[]) => Promise<void>;
   onOpenAddFutureMonth?: () => void;
 }
 
-export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, onOpenAddFutureMonth }: EditRoadmapModalProps) {
+export function EditRoadmapModal({ isOpen, student, sessions, monthlyOutlines = [], onMutateOutlines, onClose, onSave, onOpenAddFutureMonth }: EditRoadmapModalProps) {
   const [editingSessions, setEditingSessions] = useState<ClassSessionItem[]>([]);
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [uploadingOutline, setUploadingOutline] = useState(false);
 
   useEffect(() => {
     if (isOpen && student) {
@@ -239,6 +242,42 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
     setEditingSessions([...editingSessions, newSession]);
   };
 
+  const handleUploadOutline = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0 && selectedMonth !== "ALL" && student) {
+      setUploadingOutline(true);
+      const results = await uploadHomeworkFilesToStorage(files);
+      if (results.length > 0) {
+        const file = results[0];
+        const success = await insertMonthlyOutlineToDB({
+          studentId: student.id,
+          month: selectedMonth,
+          fileName: file.name,
+          fileUrl: file.url,
+          fileSize: file.size,
+        });
+        if (success && onMutateOutlines) {
+          onMutateOutlines();
+        } else {
+          alert("Lỗi khi thêm Đề cương!");
+        }
+      }
+      setUploadingOutline(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleDeleteOutline = async (outlineId: string) => {
+    if (confirm("Xóa Đề cương ôn tập này?")) {
+      const success = await deleteMonthlyOutlineToDB(outlineId);
+      if (success && onMutateOutlines) {
+        onMutateOutlines();
+      } else {
+        alert("Lỗi khi xóa Đề cương!");
+      }
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     await onSave(editingSessions, deletedIds);
@@ -318,6 +357,44 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {selectedMonth !== "ALL" && (
+          <div className="px-6 py-3 bg-emerald-950/20 border-b border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <BookOpen className="w-4 h-4" />
+                Đề Cương Ôn Tập ({selectedMonth})
+              </span>
+              <p className="text-[10px] text-emerald-300/70 mt-0.5">Tải lên đề cương để phụ huynh/học sinh tải về xem</p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              {monthlyOutlines.filter(o => o.month === selectedMonth).map(outline => (
+                <div key={outline.id} className="flex items-center gap-2 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/30">
+                  <Paperclip className="w-3.5 h-3.5 text-emerald-400" />
+                  <a href={outline.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-emerald-200 hover:underline max-w-[150px] truncate">
+                    {outline.fileName}
+                  </a>
+                  <button onClick={() => handleDeleteOutline(outline.id)} className="text-red-400 hover:text-red-300 ml-1">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              
+              <label className="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold cursor-pointer border border-emerald-500/30 transition flex items-center gap-1.5 whitespace-nowrap">
+                <Upload className="w-3.5 h-3.5" />
+                {uploadingOutline ? "Đang tải..." : "Tải lên Đề Cương"}
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
+                  className="hidden"
+                  onChange={handleUploadOutline}
+                  disabled={uploadingOutline}
+                />
+              </label>
+            </div>
           </div>
         )}
 

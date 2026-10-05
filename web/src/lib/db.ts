@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { Student } from "@/types/database";
-import { ClassSessionItem } from "@/components/CheckInModal";
+import { ClassSessionItem, StudentHomeworkFile } from "@/components/CheckInModal";
 import { NewStudentPayload } from "@/components/AddStudentModal";
 import { getCurrentMonthStr } from "./utils";
 
@@ -344,6 +344,12 @@ export async function fetchSessionsFromDB(): Promise<ClassSessionItem[]> {
         homeworkFiles: files.length > 0 ? files : null,
         homeworkFile: files.length > 0 ? files[0] : null,
         tutorFeedback: cs.tutor_feedback,
+        studentHomeworkFile: cs.student_homework_file_url ? {
+          name: cs.student_homework_file_name,
+          url: cs.student_homework_file_url,
+          size: cs.student_homework_file_size,
+          submittedAt: cs.student_homework_submitted_at,
+        } : null,
       };
     });
 
@@ -642,6 +648,112 @@ export async function markParentMessageAsReadInDB(messageId: string): Promise<bo
     return true;
   } catch (err) {
     console.error("Failed to mark parent message as read:", err);
+    return false;
+  }
+}
+
+// ===============================================
+// MONTHLY OUTLINES API
+// ===============================================
+
+export interface MonthlyOutlineItem {
+  id: string;
+  studentId: string;
+  month: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize: string;
+  createdAt: string;
+}
+
+export async function fetchMonthlyOutlinesFromDB(): Promise<MonthlyOutlineItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from("monthly_outlines")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map((mo: any) => ({
+      id: mo.id,
+      studentId: mo.student_id,
+      month: mo.month,
+      fileName: mo.file_name,
+      fileUrl: mo.file_url,
+      fileSize: mo.file_size,
+      createdAt: mo.created_at,
+    }));
+  } catch (err) {
+    console.error("Failed to fetch monthly outlines:", err);
+    return [];
+  }
+}
+
+export async function insertMonthlyOutlineToDB(outline: Omit<MonthlyOutlineItem, "id" | "createdAt">): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("monthly_outlines")
+      .insert([{
+        student_id: outline.studentId,
+        month: outline.month,
+        file_name: outline.fileName,
+        file_url: outline.fileUrl,
+        file_size: outline.fileSize,
+      }]);
+
+    if (error) {
+      console.error("Error inserting monthly outline:", error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Failed to insert monthly outline:", err);
+    return false;
+  }
+}
+
+export async function deleteMonthlyOutlineToDB(outlineId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("monthly_outlines")
+      .delete()
+      .eq("id", outlineId);
+
+    if (error) {
+      console.error("Error deleting monthly outline:", error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Failed to delete monthly outline:", err);
+    return false;
+  }
+}
+
+// ===============================================
+// STUDENT HOMEWORK SUBMISSION API
+// ===============================================
+
+export async function submitStudentHomeworkToDB(sessionId: string, fileName: string, fileUrl: string, fileSize: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("class_sessions")
+      .update({
+        student_homework_file_name: fileName,
+        student_homework_file_url: fileUrl,
+        student_homework_file_size: fileSize,
+        student_homework_submitted_at: new Date().toISOString(),
+      })
+      .eq("id", sessionId);
+
+    if (error) {
+      console.error("Error submitting student homework:", error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Failed to submit student homework:", err);
     return false;
   }
 }
