@@ -347,6 +347,8 @@ export async function fetchSessionsFromDB(): Promise<ClassSessionItem[]> {
       };
     });
 
+    sessions.sort((a, b) => parseSessionDateWeight(a.date) - parseSessionDateWeight(b.date));
+
     return sessions;
   } catch (err) {
     console.error("Failed to fetch sessions:", err);
@@ -454,6 +456,53 @@ export async function updateRoadmapSessionsInDB(updatedSessions: ClassSessionIte
   } catch (err) {
     console.error("Failed to update roadmap sessions:", err);
     return false;
+  }
+}
+
+export async function insertMultipleSessionsToDB(studentId: string, sessions: ClassSessionItem[]): Promise<ClassSessionItem[]> {
+  try {
+    const inserts = sessions.map((s) => ({
+      student_id: studentId,
+      student_name: s.student,
+      subject: s.subject,
+      topic: s.topic,
+      roadmap_topic: s.roadmapTopic || s.topic,
+      date: s.date,
+      time: s.time,
+      month: s.month || getCurrentMonthStr(),
+      status: s.status || "SCHEDULED",
+      ...formatHomeworkFilesForDB(s),
+    }));
+
+    const { data, error } = await supabase
+      .from("class_sessions")
+      .insert(inserts)
+      .select();
+
+    if (error || !data) {
+      console.error("Error inserting multiple sessions:", error);
+      return [];
+    }
+
+    return data.map((cs) => {
+      const files = parseHomeworkFilesFromDB(cs);
+      return {
+        id: cs.id,
+        student: cs.student_name,
+        subject: cs.subject,
+        topic: cs.topic,
+        roadmapTopic: cs.roadmap_topic || cs.topic,
+        time: cs.time,
+        date: cs.date,
+        month: cs.month,
+        status: cs.status,
+        homeworkFiles: files.length > 0 ? files : null,
+        homeworkFile: files.length > 0 ? files[0] : null,
+      };
+    });
+  } catch (err) {
+    console.error("Failed to insert multiple sessions:", err);
+    return [];
   }
 }
 

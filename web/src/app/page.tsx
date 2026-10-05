@@ -42,6 +42,7 @@ import { AddStudentModal, NewStudentPayload } from "@/components/AddStudentModal
 import { CheckInModal, ClassSessionItem } from "@/components/CheckInModal";
 import { ZaloReceiptModal } from "@/components/ZaloReceiptModal";
 import { EditRoadmapModal } from "@/components/EditRoadmapModal";
+import { AddFutureMonthRoadmapModal } from "@/components/AddFutureMonthRoadmapModal";
 import { EditStudentModal } from "@/components/EditStudentModal";
 import { Student } from "@/types/database";
 import { 
@@ -54,6 +55,7 @@ import {
   updateRoadmapSessionsInDB,
   updateStudentInDB,
   fetchParentMessagesFromDB,
+  insertMultipleSessionsToDB,
   ParentMessageItem
 } from "@/lib/db";
 import Link from "next/link";
@@ -107,6 +109,10 @@ export default function Dashboard() {
   const [isEditRoadmapOpen, setIsEditRoadmapOpen] = useState(false);
   const [selectedRoadmapStudent, setSelectedRoadmapStudent] = useState<Student | null>(null);
 
+  // Add Future Month Roadmap State
+  const [isAddFutureMonthOpen, setIsAddFutureMonthOpen] = useState(false);
+  const [selectedFutureMonthStudent, setSelectedFutureMonthStudent] = useState<Student | null>(null);
+
   // Edit Student Details State
   const [isEditStudentOpen, setIsEditStudentOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -117,6 +123,19 @@ export default function Dashboard() {
 
   // Reschedule Requests Drawer State
   const [showRescheduleDrawer, setShowRescheduleDrawer] = useState(false);
+
+  const handleSaveFutureMonthRoadmap = async (newSessions: ClassSessionItem[]) => {
+    if (!selectedFutureMonthStudent) return;
+    const created = await insertMultipleSessionsToDB(
+      selectedFutureMonthStudent.id,
+      newSessions
+    );
+    if (created && created.length > 0) {
+      setUpcomingClasses((prev) => [...prev, ...created]);
+    }
+    setIsAddFutureMonthOpen(false);
+    setSelectedFutureMonthStudent(null);
+  };
 
   // Load Real Data from Supabase DB on startup + get current user
   useEffect(() => {
@@ -357,6 +376,20 @@ export default function Dashboard() {
           setSelectedRoadmapStudent(null);
         }}
         onSave={handleSaveRoadmap}
+        onOpenAddFutureMonth={() => {
+          setSelectedFutureMonthStudent(selectedRoadmapStudent);
+          setIsAddFutureMonthOpen(true);
+        }}
+      />
+
+      <AddFutureMonthRoadmapModal
+        isOpen={isAddFutureMonthOpen}
+        student={selectedFutureMonthStudent}
+        onClose={() => {
+          setIsAddFutureMonthOpen(false);
+          setSelectedFutureMonthStudent(null);
+        }}
+        onSave={handleSaveFutureMonthRoadmap}
       />
 
       <EditStudentModal

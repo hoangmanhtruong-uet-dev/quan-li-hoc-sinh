@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, UserPlus, BookOpen, Phone, DollarSign, GraduationCap, Calendar, Clock, ArrowRight, Sparkles, Check, ArrowLeft, Trash2, Plus, Upload, Paperclip } from "lucide-react";
 import { Student, Subject } from "@/types/database";
 import { uploadHomeworkFilesToStorage } from "@/lib/storage";
+import { generateDatesForMonth, getCurrentMonthStr } from "@/lib/utils";
 
 export interface RoadmapSessionConfig {
   date: string;
@@ -140,34 +141,16 @@ export function AddStudentModal({ isOpen, onClose, onAddStudent }: AddStudentMod
     const suggestions = defaultRoadmapSuggestions[subject] || defaultRoadmapSuggestions["Hóa học"];
     const generatedSessions: RoadmapSessionConfig[] = [];
 
-    // Mock generated dates for 8 sessions in month
-    let topicIdx = 0;
-    const dayDateMapping: Record<string, string[]> = {
-      "Thứ 2": ["Thứ 2, 05/10", "Thứ 2, 12/10", "Thứ 2, 19/10", "Thứ 2, 26/10"],
-      "Thứ 3": ["Thứ 3, 06/10", "Thứ 3, 13/10", "Thứ 3, 20/10", "Thứ 3, 27/10"],
-      "Thứ 4": ["Thứ 4, 07/10", "Thứ 4, 14/10", "Thứ 4, 21/10", "Thứ 4, 28/10"],
-      "Thứ 5": ["Thứ 5, 01/10", "Thứ 5, 08/10", "Thứ 5, 15/10", "Thứ 5, 22/10"],
-      "Thứ 6": ["Thứ 6, 02/10", "Thứ 6, 09/10", "Thứ 6, 16/10", "Thứ 6, 23/10"],
-      "Thứ 7": ["Thứ 7, 10/10", "Thứ 7, 17/10", "Thứ 7, 24/10", "Thứ 7, 31/10"],
-      "Chủ Nhật": ["CN, 04/10", "CN, 11/10", "CN, 18/10", "CN, 25/10"],
-    };
+    // Generate real calendar dates chronologically for current month
+    const monthDates = generateDatesForMonth(getCurrentMonthStr(), selectedDays);
 
-    // Gather dates in order
-    const allDates: { dateStr: string; day: string }[] = [];
-    selectedDays.forEach((day) => {
-      const dates = dayDateMapping[day] || [];
-      dates.forEach((d) => allDates.push({ dateStr: d, day }));
-    });
-
-    // Sort roughly by date index
-    allDates.slice(0, 8).forEach((item) => {
+    monthDates.slice(0, 8).forEach((item, topicIdx) => {
       generatedSessions.push({
         date: item.dateStr,
-        dayOfWeek: item.day,
+        dayOfWeek: item.dayOfWeek,
         time: scheduleTime,
         topic: suggestions[topicIdx % suggestions.length] || `Bài ${topicIdx + 1}: Chuyên đề ${subject}`,
       });
-      topicIdx++;
     });
 
     setRoadmapSessions(generatedSessions);

@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
-import { X, Save, Trash2, Plus, Calendar, Clock, BookOpen, Upload, Paperclip, ArrowUp, ArrowDown } from "lucide-react";
+import { X, Save, Trash2, Plus, Calendar, Clock, BookOpen, Upload, Paperclip, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
 import { ClassSessionItem } from "./CheckInModal";
 import { Student } from "@/types/database";
 import { uploadHomeworkFilesToStorage } from "@/lib/storage";
+import { parseSessionDateWeight } from "@/lib/db";
+import { generateDatesForMonth, getCurrentMonthStr } from "@/lib/utils";
 
 interface EditRoadmapModalProps {
   isOpen: boolean;
@@ -10,9 +12,10 @@ interface EditRoadmapModalProps {
   sessions: ClassSessionItem[];
   onClose: () => void;
   onSave: (updatedSessions: ClassSessionItem[], deletedSessionIds: string[]) => Promise<void>;
+  onOpenAddFutureMonth?: () => void;
 }
 
-export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }: EditRoadmapModalProps) {
+export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, onOpenAddFutureMonth }: EditRoadmapModalProps) {
   const [editingSessions, setEditingSessions] = useState<ClassSessionItem[]>([]);
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -28,43 +31,48 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
 
   if (!isOpen || !student) return null;
 
+  const reassignDates = (list: ClassSessionItem[]) => {
+    if (list.length === 0) return list;
+    const monthStr = list[0].month || getCurrentMonthStr();
+    const generatedDates = generateDatesForMonth(monthStr, ["Thứ 2", "Thứ 7"]);
+    return list.map((s, idx) => {
+      const generatedDate = generatedDates[idx];
+      if (generatedDate) {
+        const isT2 = generatedDate.dayOfWeek === "Thứ 2" || generatedDate.dayOfWeek.includes("2");
+        return {
+          ...s,
+          date: generatedDate.dateStr,
+          time: isT2 ? "19:30 - 21:30" : "17:00 - 19:00",
+          month: monthStr,
+        };
+      }
+      return s;
+    });
+  };
+
+  const handleSortDatesChronologically = () => {
+    setEditingSessions((prev) => reassignDates(prev));
+  };
+
   const handleMoveUp = (index: number) => {
     if (index <= 0) return;
-    setEditingSessions(prev => {
+    setEditingSessions((prev) => {
       const next = [...prev];
-      // Swap date and time to preserve schedule timeline slots
-      const tempDate = next[index].date;
-      const tempTime = next[index].time;
-      next[index].date = next[index - 1].date;
-      next[index].time = next[index - 1].time;
-      next[index - 1].date = tempDate;
-      next[index - 1].time = tempTime;
-
-      // Swap positions in array
       const temp = next[index];
       next[index] = next[index - 1];
       next[index - 1] = temp;
-      return next;
+      return reassignDates(next);
     });
   };
 
   const handleMoveDown = (index: number) => {
     if (index >= editingSessions.length - 1) return;
-    setEditingSessions(prev => {
+    setEditingSessions((prev) => {
       const next = [...prev];
-      // Swap date and time to preserve schedule timeline slots
-      const tempDate = next[index].date;
-      const tempTime = next[index].time;
-      next[index].date = next[index + 1].date;
-      next[index].time = next[index + 1].time;
-      next[index + 1].date = tempDate;
-      next[index + 1].time = tempTime;
-
-      // Swap positions in array
       const temp = next[index];
       next[index] = next[index + 1];
       next[index + 1] = temp;
-      return next;
+      return reassignDates(next);
     });
   };
 
@@ -162,12 +170,22 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
               Sửa đổi các buổi học sắp tới (Chỉ áp dụng cho các buổi chưa điểm danh)
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSortDatesChronologically}
+              className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+              title="Tự động sắp xếp các ngày học theo đúng thứ tự thời gian tăng dần trong tháng"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              Sắp Xếp Chuẩn Lịch
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -302,13 +320,28 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
           })
           )}
 
-          <button
-            onClick={handleAddSession}
-            className="w-full py-3 border-2 border-dashed border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 hover:border-indigo-500/50 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition"
-          >
-            <Plus className="w-4 h-4" />
-            Thêm Buổi Học Mới
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              onClick={handleAddSession}
+              className="py-3 border border-dashed border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 hover:border-indigo-500/50 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition"
+            >
+              <Plus className="w-4 h-4" />
+              Thêm 1 Buổi Học Lẻ
+            </button>
+
+            {onOpenAddFutureMonth && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenAddFutureMonth();
+                }}
+                className="py-3 bg-gradient-to-r from-purple-600/20 to-indigo-600/20 hover:from-purple-600/30 hover:to-indigo-600/30 border border-purple-500/40 text-purple-300 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition shadow-sm"
+              >
+                <Calendar className="w-4 h-4 text-purple-400" />
+                ➕ Tạo Lộ Trình Tháng Tới (Tự Động)
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Footer */}

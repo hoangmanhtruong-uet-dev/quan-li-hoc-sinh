@@ -130,11 +130,20 @@ export default function ParentPortalPage() {
     }
   };
 
-  const completedSessionsCount = sessions.filter((s) => s.status === "COMPLETED").length;
-  const currentMonthStr = getCurrentMonthStr();
+  // Month Filter State for Parent
+  const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
+
+  const availableMonths = Array.from(new Set(sessions.map((s) => s.month).filter(Boolean)));
+
+  const displayedSessions = selectedMonth === "ALL" 
+    ? sessions 
+    : sessions.filter((s) => s.month === selectedMonth);
+
+  const completedSessionsCount = displayedSessions.filter((s) => s.status === "COMPLETED").length;
+  const currentMonthStr = selectedMonth === "ALL" ? getCurrentMonthStr() : selectedMonth;
   const hourlyRate = student?.hourlyRate || 200000;
   const actualFee = completedSessionsCount * hourlyRate;
-  const projectedFee = (sessions.length || 8) * hourlyRate;
+  const projectedFee = (displayedSessions.length || 8) * hourlyRate;
 
   // VietQR Code Details - HOANG MANH TRUONG
   const tutorName = "HOANG MANH TRUONG";
@@ -549,13 +558,52 @@ export default function ParentPortalPage() {
 
             {/* Learning Roadmap & Session History */}
             <div className="space-y-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-indigo-400" />
-                Lộ Trình Buổi Học & Đánh Giá
-              </h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-indigo-400" />
+                  Lộ Trình Buổi Học & Đánh Giá
+                </h3>
+
+                {/* Month Filter Selector Bar for Parent */}
+                {availableMonths.length > 0 && (
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    <button
+                      onClick={() => setSelectedMonth("ALL")}
+                      className={cn(
+                        "px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap border shrink-0",
+                        selectedMonth === "ALL"
+                          ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                          : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                      )}
+                    >
+                      Tất cả ({sessions.length})
+                    </button>
+                    {availableMonths.map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setSelectedMonth(m)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap border shrink-0 flex items-center gap-1.5",
+                          selectedMonth === m
+                            ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                            : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                        )}
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                        {m} ({sessions.filter((s) => s.month === m).length})
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="space-y-4">
-                {sessions.map((session, index) => {
+                {displayedSessions.length === 0 ? (
+                  <div className="glass p-8 text-center rounded-2xl border border-white/5 text-xs text-slate-400">
+                    Chưa có buổi học nào trong {selectedMonth}.
+                  </div>
+                ) : (
+                  displayedSessions.map((session, index) => {
                   const files = session.homeworkFiles && session.homeworkFiles.length > 0
                     ? session.homeworkFiles
                     : (session.homeworkFile ? [session.homeworkFile] : []);
@@ -685,7 +733,7 @@ export default function ParentPortalPage() {
                       )}
                     </div>
                   );
-                })}
+                }))}
               </div>
             </div>
           </>
