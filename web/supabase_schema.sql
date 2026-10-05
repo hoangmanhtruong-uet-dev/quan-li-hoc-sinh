@@ -91,42 +91,39 @@ ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 -- Gia sư chỉ quản trị dữ liệu của chính mình thông qua tutor_id
 -- ================================================
 
--- Students: Gia sư toàn quyền trên học sinh của mình
+-- Students: Gia sư toàn quyền trên học sinh của mình (kể cả khi tutor_id là NULL)
 DROP POLICY IF EXISTS "Allow all for students" ON public.students;
 DROP POLICY IF EXISTS "Tutor full CRUD on own students" ON public.students;
 CREATE POLICY "Tutor full CRUD on own students"
   ON public.students
   FOR ALL
-  TO authenticated
-  USING (tutor_id = auth.uid())
-  WITH CHECK (tutor_id = auth.uid());
+  USING (tutor_id IS NULL OR tutor_id = auth.uid())
+  WITH CHECK (tutor_id IS NULL OR tutor_id = auth.uid());
 
--- Class Sessions: Gia sư toàn quyền trên buổi học của học sinh mình
+-- Class Sessions: Gia sư toàn quyền trên buổi học
 DROP POLICY IF EXISTS "Allow all for class_sessions" ON public.class_sessions;
 DROP POLICY IF EXISTS "Tutor full CRUD on own sessions" ON public.class_sessions;
 CREATE POLICY "Tutor full CRUD on own sessions"
   ON public.class_sessions
   FOR ALL
-  TO authenticated
   USING (
-    student_id IN (SELECT id FROM public.students WHERE tutor_id = auth.uid())
+    student_id IN (SELECT id FROM public.students WHERE tutor_id IS NULL OR tutor_id = auth.uid())
   )
   WITH CHECK (
-    student_id IN (SELECT id FROM public.students WHERE tutor_id = auth.uid())
+    student_id IN (SELECT id FROM public.students WHERE tutor_id IS NULL OR tutor_id = auth.uid())
   );
 
--- Invoices: Gia sư toàn quyền trên hoá đơn của học sinh mình
+-- Invoices: Gia sư toàn quyền trên hoá đơn
 DROP POLICY IF EXISTS "Allow all for invoices" ON public.invoices;
 DROP POLICY IF EXISTS "Tutor full CRUD on own invoices" ON public.invoices;
 CREATE POLICY "Tutor full CRUD on own invoices"
   ON public.invoices
   FOR ALL
-  TO authenticated
   USING (
-    student_id IN (SELECT id FROM public.students WHERE tutor_id = auth.uid())
+    student_id IN (SELECT id FROM public.students WHERE tutor_id IS NULL OR tutor_id = auth.uid())
   )
   WITH CHECK (
-    student_id IN (SELECT id FROM public.students WHERE tutor_id = auth.uid())
+    student_id IN (SELECT id FROM public.students WHERE tutor_id IS NULL OR tutor_id = auth.uid())
   );
 
 -- ================================================

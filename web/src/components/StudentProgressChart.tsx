@@ -26,15 +26,15 @@ export function StudentProgressChart({ sessions }: StudentProgressChartProps) {
   const latestScore = chartData[chartData.length - 1]?.score;
 
   return (
-    <div className="glass p-5 rounded-2xl border border-indigo-500/20 bg-indigo-950/20 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="glass p-4 sm:p-5 rounded-2xl border border-indigo-500/20 bg-indigo-950/20 space-y-4">
+      <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
             <Trophy className="w-4 h-4" />
           </div>
           <div>
-            <h4 className="font-bold text-white text-sm flex items-center gap-2">
-              Biểu Đồ Tiến Bộ Điểm Số
+            <h4 className="font-bold text-white text-sm flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <span>Biểu Đồ Tiến Bộ Điểm Số</span>
               <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
                 <TrendingUp className="w-3 h-3" />
                 Tăng trưởng tốt
@@ -44,7 +44,7 @@ export function StudentProgressChart({ sessions }: StudentProgressChartProps) {
           </div>
         </div>
 
-        <div className="text-right">
+        <div className="text-left xs:text-right self-end xs:self-auto">
           <span className="text-[10px] text-slate-400 block font-semibold">Điểm gần nhất</span>
           <span className="text-lg font-extrabold text-amber-400">{latestScore}/10</span>
         </div>

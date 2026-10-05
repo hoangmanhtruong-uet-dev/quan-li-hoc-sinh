@@ -161,11 +161,11 @@ export default function ParentPortalPage() {
 
       {/* Session Details Modal for Parent */}
       {selectedDetailSession && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="glass w-full max-w-lg rounded-2xl p-6 relative shadow-2xl border border-white/10 space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="glass w-full max-w-lg rounded-2xl p-4 sm:p-6 relative shadow-2xl border border-white/10 space-y-4 sm:space-y-5 max-h-[92vh] overflow-y-auto">
             <button
               onClick={() => setSelectedDetailSession(null)}
-              className="absolute top-4 right-4 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
+              className="absolute top-3.5 right-3.5 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
             >
               <X className="w-5 h-5" />
             </button>
@@ -188,29 +188,29 @@ export default function ParentPortalPage() {
                   </span>
                 )}
               </div>
-              <h3 className="text-xl font-bold text-white pt-1.5">{selectedDetailSession.topic}</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-white pt-1.5 leading-snug">{selectedDetailSession.topic}</h3>
               <p className="text-xs text-slate-400">Học sinh: <span className="text-white font-medium">{student?.name}</span> • Môn {student?.subject}</p>
             </div>
 
             {/* Date & Time Info Card */}
-            <div className="grid grid-cols-2 gap-3 bg-indigo-950/40 p-3.5 rounded-xl border border-indigo-500/20 text-xs">
-              <div className="flex items-center gap-2.5">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 bg-indigo-950/40 p-3 rounded-xl border border-indigo-500/20 text-xs">
+              <div className="flex items-center gap-2 sm:gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
                   <Calendar className="w-4 h-4" />
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 block font-medium">Ngày học:</span>
-                  <span className="text-white font-bold">{selectedDetailSession.date}</span>
+                  <span className="text-white font-bold text-xs">{selectedDetailSession.date}</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2 sm:gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
                   <Clock className="w-4 h-4" />
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 block font-medium">Giờ học:</span>
-                  <span className="text-white font-bold">{selectedDetailSession.time}</span>
+                  <span className="text-white font-bold text-xs">{selectedDetailSession.time}</span>
                 </div>
               </div>
             </div>
@@ -222,7 +222,7 @@ export default function ParentPortalPage() {
                 Đánh giá & Nhận xét từ Gia sư:
               </span>
               {selectedDetailSession.tutorFeedback ? (
-                <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 text-xs text-slate-200 leading-relaxed">
+                <div className="bg-white/5 p-3 sm:p-3.5 rounded-xl border border-white/10 text-xs text-slate-200 leading-relaxed">
                   {selectedDetailSession.tutorFeedback}
                 </div>
               ) : (
@@ -264,18 +264,18 @@ export default function ParentPortalPage() {
                       Tệp tài liệu đính kèm ({files.length} file):
                     </span>
                     {files.map((file, fileIdx) => (
-                      <div key={fileIdx} className="flex items-center justify-between bg-purple-500/10 p-3 rounded-xl border border-purple-500/20 text-xs">
-                        <div className="flex items-center gap-2.5 overflow-hidden">
+                      <div key={fileIdx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-purple-500/10 p-2.5 sm:p-3 rounded-xl border border-purple-500/20 text-xs gap-2">
+                        <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
                           <Paperclip className="w-4 h-4 text-purple-400 shrink-0" />
-                          <div>
-                            <span className="text-white font-semibold block truncate max-w-[220px]">{file.name}</span>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-white font-semibold block truncate">{file.name}</span>
                             <span className="text-[10px] text-purple-300/70 block">Dung lượng: {file.size}</span>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => handleDownloadFile(file.url, file.name)}
-                          className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0"
+                          className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm shrink-0"
                         >
                           <Download className="w-3.5 h-3.5" />
                           Tải File
@@ -288,21 +288,21 @@ export default function ParentPortalPage() {
             </div>
 
             {/* Footer Buttons */}
-            <div className="pt-2 flex justify-end gap-2 border-t border-white/5">
+            <div className="pt-2 flex flex-col-reverse sm:flex-row justify-end gap-2 border-t border-white/5">
               {selectedDetailSession.status !== "COMPLETED" && !selectedDetailSession.rescheduleRequest && (
                 <button
                   onClick={() => {
                     setRescheduleSessionTarget(selectedDetailSession);
                     setSelectedDetailSession(null);
                   }}
-                  className="px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold transition"
+                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold transition text-center"
                 >
                   Xin Nghỉ / Đổi Lịch
                 </button>
               )}
               <button
                 onClick={() => setSelectedDetailSession(null)}
-                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-sm"
+                className="w-full sm:w-auto px-5 py-2.5 sm:py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-sm text-center"
               >
                 Đóng
               </button>
@@ -419,35 +419,35 @@ export default function ParentPortalPage() {
       )}
 
       {/* Top Banner Header */}
-      <div className="bg-gradient-to-r from-indigo-900/40 via-purple-900/40 to-slate-900 border-b border-white/10 py-6 px-4">
-        <div className="max-w-3xl mx-auto flex justify-between items-center">
+      <div className="bg-gradient-to-r from-indigo-900/40 via-purple-900/40 to-slate-900 border-b border-white/10 py-4 sm:py-6 px-4">
+        <div className="max-w-3xl mx-auto flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shadow-lg">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shadow-lg shrink-0">
               <GraduationCap className="w-6 h-6" />
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 inline-block">
                 TutorTrack Portal
               </span>
-              <h1 className="text-lg font-bold text-white">Sổ Theo Dõi Học Tập Chi Tiết</h1>
+              <h1 className="text-base sm:text-lg font-bold text-white">Sổ Theo Dõi Học Tập Chi Tiết</h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setShowPDFModal(true)}
-              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/40 text-xs font-bold text-white flex items-center gap-1.5 transition shadow-sm"
+              className="flex-1 sm:flex-none justify-center px-3.5 py-2.5 sm:py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 border border-indigo-500/40 text-xs font-bold text-white flex items-center gap-1.5 transition shadow-sm"
             >
-              <Printer className="w-4 h-4" />
-              In / Xuất PDF
+              <Printer className="w-4 h-4 shrink-0" />
+              <span>In / Xuất PDF</span>
             </button>
 
             <button
               onClick={handleCopyLink}
-              className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-300 flex items-center gap-2 transition"
+              className="flex-1 sm:flex-none justify-center px-3.5 py-2.5 sm:py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-300 flex items-center gap-2 transition"
             >
-              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4 text-indigo-400" />}
-              {copied ? "Đã sao chép" : "Chia sẻ link"}
+              {copied ? <Check className="w-4 h-4 text-emerald-400 shrink-0" /> : <Share2 className="w-4 h-4 text-indigo-400 shrink-0" />}
+              <span>{copied ? "Đã sao chép" : "Chia sẻ link"}</span>
             </button>
           </div>
         </div>
@@ -477,16 +477,16 @@ export default function ParentPortalPage() {
         {!loading && student && (
           <>
             {/* Student Info Card */}
-            <div className="glass p-6 rounded-2xl border border-white/10 relative overflow-hidden">
+            <div className="glass p-4 sm:p-6 rounded-2xl border border-white/10 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
               
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold mb-2">
-                    <Sparkles className="w-3.5 h-3.5" />
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
                     Môn {student.subject} • {student.grade}
                   </div>
-                  <h2 className="text-2xl font-bold text-white">{student.name}</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-white leading-tight">{student.name}</h2>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 mt-1">
                     {student.parentName && (
                       <span className="text-indigo-300 font-medium">Phụ huynh: <strong className="text-white">{student.parentName}</strong></span>
@@ -495,48 +495,50 @@ export default function ParentPortalPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
                   <button
                     onClick={() => setShowFeedbackModal(true)}
-                    className="px-3.5 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition"
+                    className="py-2.5 px-3.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
                   >
-                    <MessageSquare className="w-4 h-4" />
-                    Gửi Lời Nhắn
+                    <MessageSquare className="w-4 h-4 shrink-0" />
+                    <span>Gửi Lời Nhắn</span>
                   </button>
 
                   <a
                     href={`tel:0912345678`}
-                    className="px-3.5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition"
+                    className="py-2.5 px-3.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition text-center"
                   >
-                    <PhoneCall className="w-4 h-4" />
-                    Gọi Gia Sư
+                    <PhoneCall className="w-4 h-4 shrink-0" />
+                    <span>Gọi Gia Sư</span>
                   </a>
                 </div>
               </div>
 
               {/* Quick Stats & VietQR Button */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 pt-6 border-t border-white/5">
-                <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-                  <span className="text-xs text-slate-400 block mb-1">Số buổi đã học ({currentMonthStr})</span>
-                  <span className="text-xl font-bold text-emerald-400 flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5" />
-                    {completedSessionsCount} / {sessions.length || 8} buổi
-                  </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-5 pt-5 border-t border-white/5">
+                <div className="bg-white/5 p-3.5 sm:p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-slate-400 block mb-0.5">Số buổi đã học ({currentMonthStr})</span>
+                    <span className="text-lg sm:text-xl font-bold text-emerald-400 flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 shrink-0" />
+                      {completedSessionsCount} / {sessions.length || 8} buổi
+                    </span>
+                  </div>
                 </div>
 
-                <div className="bg-white/5 p-4 rounded-xl border border-white/5 flex items-center justify-between">
+                <div className="bg-white/5 p-3.5 sm:p-4 rounded-xl border border-white/5 flex flex-row items-center justify-between gap-3">
                   <div>
                     <span className="text-xs text-slate-400 block mb-0.5">Học phí thực tế ({currentMonthStr})</span>
-                    <span className="text-xl font-bold text-amber-400">{actualFee.toLocaleString()} VNĐ</span>
-                    <span className="text-[10px] text-slate-400 block">(Dự kiến cả tháng: {projectedFee.toLocaleString()} VNĐ)</span>
+                    <span className="text-lg sm:text-xl font-bold text-amber-400 block">{actualFee.toLocaleString()} VNĐ</span>
+                    <span className="text-[10px] text-slate-400 block">(Dự kiến: {projectedFee.toLocaleString()} VNĐ)</span>
                   </div>
 
                   <button
                     onClick={() => setShowQRModal(true)}
-                    className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                    className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm shrink-0"
                   >
-                    <QrCode className="w-4 h-4 text-amber-400" />
-                    Mã QR Bank
+                    <QrCode className="w-4 h-4 text-amber-400 shrink-0" />
+                    Mã QR
                   </button>
                 </div>
               </div>
@@ -564,38 +566,38 @@ export default function ParentPortalPage() {
                       key={session.id}
                       onClick={() => setSelectedDetailSession(session)}
                       className={cn(
-                        "glass p-5 rounded-2xl border transition-all cursor-pointer group hover:scale-[1.005]",
+                        "glass p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer group hover:scale-[1.005]",
                         session.status === "COMPLETED" 
                           ? "border-emerald-500/20 bg-emerald-950/10 hover:border-emerald-500/40" 
                           : "border-white/5 bg-indigo-500/5 hover:border-indigo-500/30"
                       )}
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                        <div className="flex items-center gap-3">
-                          <span className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-xs font-bold text-indigo-300">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3">
+                        <div className="flex items-start gap-3">
+                          <span className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-xs font-bold text-indigo-300 shrink-0 mt-0.5">
                             #{index + 1}
                           </span>
                           <div>
-                            <h4 className="font-bold text-white text-base group-hover:text-indigo-300 transition-colors">
+                            <h4 className="font-bold text-white text-sm sm:text-base group-hover:text-indigo-300 transition-colors leading-snug">
                               {session.topic}
                             </h4>
-                            <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                              <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                            <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-1">
+                              <Clock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                               {session.date} • {session.time}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 self-start sm:self-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto pl-10 sm:pl-0" onClick={(e) => e.stopPropagation()}>
                           {session.testScore !== undefined && (
-                            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                            <span className="text-[11px] sm:text-xs font-bold px-2.5 py-0.5 sm:py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                              <Trophy className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                               {session.testScore}/10
                             </span>
                           )}
 
                           <span className={cn(
-                            "text-xs font-bold px-3 py-1 rounded-full border",
+                            "text-[11px] sm:text-xs font-bold px-2.5 py-0.5 sm:py-1 rounded-full border",
                             session.status === "COMPLETED" 
                               ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
                               : "bg-amber-500/10 text-amber-400 border-amber-500/30"
@@ -618,19 +620,19 @@ export default function ParentPortalPage() {
                       </div>
 
                       {session.rescheduleRequest && (
-                        <div className="mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center justify-between">
+                        <div className="mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex flex-col xs:flex-row xs:items-center justify-between gap-1">
                           <span>⏳ Đã gửi yêu cầu đổi lịch: <strong>{session.rescheduleRequest.reason}</strong></span>
-                          <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full font-bold">Chờ Gia sư duyệt</span>
+                          <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full font-bold self-start xs:self-auto">Chờ Gia sư duyệt</span>
                         </div>
                       )}
 
                       {/* Session Feedback, Homework & File Attachment */}
                       {hasDetails && (
-                        <div className="mt-4 pt-4 border-t border-white/5 space-y-3 text-sm">
+                        <div className="mt-3 pt-3 sm:mt-4 sm:pt-4 border-t border-white/5 space-y-3 text-sm">
                           {session.tutorFeedback && (
-                            <div className="bg-indigo-950/40 p-3.5 rounded-xl border border-indigo-500/20">
+                            <div className="bg-indigo-950/40 p-3 sm:p-3.5 rounded-xl border border-indigo-500/20">
                               <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5 mb-1">
-                                <Award className="w-4 h-4 text-indigo-400" />
+                                <Award className="w-4 h-4 text-indigo-400 shrink-0" />
                                 Nhận xét từ Gia sư:
                               </span>
                               <p className="text-slate-300 text-xs leading-relaxed">{session.tutorFeedback}</p>
@@ -638,11 +640,11 @@ export default function ParentPortalPage() {
                           )}
 
                           {(session.homework || files.length > 0) && (
-                            <div className="bg-white/5 p-3.5 rounded-xl border border-white/5 space-y-2" onClick={(e) => e.stopPropagation()}>
+                            <div className="bg-white/5 p-3 sm:p-3.5 rounded-xl border border-white/5 space-y-2" onClick={(e) => e.stopPropagation()}>
                               {session.homework && (
                                 <div>
                                   <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5 mb-1">
-                                    <FileText className="w-4 h-4 text-purple-400" />
+                                    <FileText className="w-4 h-4 text-purple-400 shrink-0" />
                                     Bài tập về nhà:
                                   </span>
                                   <p className="text-slate-300 text-xs">{session.homework}</p>
@@ -651,13 +653,13 @@ export default function ParentPortalPage() {
 
                               {/* File Download List for Parent */}
                               {files.length > 0 && (
-                                <div className="pt-2 border-t border-white/5 space-y-1.5">
+                                <div className="pt-2 border-t border-white/5 space-y-2">
                                   <span className="text-[11px] font-semibold text-purple-300 block mb-1">
                                     File đính kèm ({files.length}):
                                   </span>
                                   {files.map((file, fileIdx) => (
-                                    <div key={fileIdx} className="flex items-center justify-between bg-purple-500/10 p-2.5 rounded-lg border border-purple-500/20">
-                                      <div className="flex items-center gap-2 overflow-hidden">
+                                    <div key={fileIdx} className="flex flex-col xs:flex-row xs:items-center justify-between bg-purple-500/10 p-2.5 rounded-lg border border-purple-500/20 gap-2">
+                                      <div className="flex items-center gap-2 overflow-hidden min-w-0">
                                         <Paperclip className="w-4 h-4 text-purple-400 shrink-0" />
                                         <span className="text-xs text-white font-medium truncate">{file.name}</span>
                                         <span className="text-[10px] text-purple-300/80 shrink-0">({file.size})</span>
@@ -668,7 +670,7 @@ export default function ParentPortalPage() {
                                           e.stopPropagation();
                                           handleDownloadFile(file.url, file.name);
                                         }}
-                                        className="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-semibold flex items-center gap-1 transition shrink-0"
+                                        className="w-full xs:w-auto px-2.5 py-1.5 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-semibold flex items-center justify-center gap-1 transition shrink-0"
                                       >
                                         <Download className="w-3 h-3" />
                                         Tải Đề Bài

@@ -135,21 +135,36 @@ export async function insertStudentWithRoadmapToDB(payload: NewStudentPayload): 
       name: payload.name,
       grade: payload.grade,
       subject: payload.subject,
-      parent_name: payload.parentName || null,
       parent_phone: payload.parentPhone,
       hourly_rate: payload.hourlyRate,
       schedule_days: payload.scheduleDays.join(", "),
       schedule_time: payload.scheduleTime,
     };
+    if (payload.parentName) {
+      insertData.parent_name = payload.parentName;
+    }
     if (tutorId) {
       insertData.tutor_id = tutorId;
     }
 
-    const { data: studentData, error: studentErr } = await supabase
+    let { data: studentData, error: studentErr } = await supabase
       .from("students")
       .insert([insertData])
       .select()
       .single();
+
+    // Fallback if parent_name column does not exist in Supabase yet
+    if (studentErr && insertData.parent_name) {
+      console.warn("parent_name column missing on insert. Retrying without parent_name.");
+      delete insertData.parent_name;
+      const fallbackRes = await supabase
+        .from("students")
+        .insert([insertData])
+        .select()
+        .single();
+      studentData = fallbackRes.data;
+      studentErr = fallbackRes.error;
+    }
 
     if (studentErr || !studentData) {
       console.error("Error inserting student to Supabase:", studentErr);
@@ -235,17 +250,32 @@ export async function deleteStudentFromDB(studentId: string): Promise<boolean> {
 
 export async function updateStudentInDB(updatedStudent: Student): Promise<boolean> {
   try {
-    const { error: studentErr } = await supabase
+    const updatePayload: any = {
+      name: updatedStudent.name,
+      grade: updatedStudent.grade,
+      subject: updatedStudent.subject,
+      parent_phone: updatedStudent.parentPhone || "",
+      hourly_rate: updatedStudent.hourlyRate,
+    };
+    if (updatedStudent.parentName !== undefined) {
+      updatePayload.parent_name = updatedStudent.parentName || null;
+    }
+
+    let { error: studentErr } = await supabase
       .from("students")
-      .update({
-        name: updatedStudent.name,
-        grade: updatedStudent.grade,
-        subject: updatedStudent.subject,
-        parent_name: updatedStudent.parentName || null,
-        parent_phone: updatedStudent.parentPhone || "",
-        hourly_rate: updatedStudent.hourlyRate,
-      })
+      .update(updatePayload)
       .eq("id", updatedStudent.id);
+
+    // Fallback if parent_name column does not exist in Supabase database schema yet
+    if (studentErr) {
+      console.warn("Supabase update error (possibly parent_name column missing). Trying fallback update:", studentErr.message);
+      delete updatePayload.parent_name;
+      const fallbackRes = await supabase
+        .from("students")
+        .update(updatePayload)
+        .eq("id", updatedStudent.id);
+      studentErr = fallbackRes.error;
+    }
 
     if (studentErr) {
       console.error("Error updating student in Supabase:", studentErr);
