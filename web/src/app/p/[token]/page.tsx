@@ -53,6 +53,9 @@ export default function ParentPortalPage() {
   // Reschedule Modal State
   const [rescheduleSessionTarget, setRescheduleSessionTarget] = useState<ClassSessionItem | null>(null);
 
+  // Session Detail Modal State for Parent
+  const [selectedDetailSession, setSelectedDetailSession] = useState<ClassSessionItem | null>(null);
+
   useEffect(() => {
     async function loadData() {
       setLoading(true);
@@ -153,6 +156,160 @@ export default function ParentPortalPage() {
         onClose={() => setRescheduleSessionTarget(null)}
         onSubmitRequest={handleRescheduleSubmit}
       />
+
+      {/* Session Details Modal for Parent */}
+      {selectedDetailSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="glass w-full max-w-lg rounded-2xl p-6 relative shadow-2xl border border-white/10 space-y-5">
+            <button
+              onClick={() => setSelectedDetailSession(null)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Title & Status Header */}
+            <div className="space-y-1 pr-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={cn(
+                  "text-xs font-bold px-2.5 py-0.5 rounded-full border",
+                  selectedDetailSession.status === "COMPLETED"
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                    : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                )}>
+                  {selectedDetailSession.status === "COMPLETED" ? "✅ Đã Hoàn Thành" : "📅 Sắp Diễn Ra"}
+                </span>
+                {selectedDetailSession.testScore !== undefined && (
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                    <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                    Điểm: {selectedDetailSession.testScore}/10
+                  </span>
+                )}
+              </div>
+              <h3 className="text-xl font-bold text-white pt-1.5">{selectedDetailSession.topic}</h3>
+              <p className="text-xs text-slate-400">Học sinh: <span className="text-white font-medium">{student?.name}</span> • Môn {student?.subject}</p>
+            </div>
+
+            {/* Date & Time Info Card */}
+            <div className="grid grid-cols-2 gap-3 bg-indigo-950/40 p-3.5 rounded-xl border border-indigo-500/20 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">Ngày học:</span>
+                  <span className="text-white font-bold">{selectedDetailSession.date}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-medium">Giờ học:</span>
+                  <span className="text-white font-bold">{selectedDetailSession.time}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tutor Feedback */}
+            <div className="space-y-1.5">
+              <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-indigo-400" />
+                Đánh giá & Nhận xét từ Gia sư:
+              </span>
+              {selectedDetailSession.tutorFeedback ? (
+                <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 text-xs text-slate-200 leading-relaxed">
+                  {selectedDetailSession.tutorFeedback}
+                </div>
+              ) : (
+                <div className="bg-white/5 p-3 rounded-xl border border-white/5 text-xs text-slate-400 italic">
+                  Chưa có nhận xét cho buổi học này.
+                </div>
+              )}
+            </div>
+
+            {/* Homework & Attachments */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-purple-400" />
+                Bài tập về nhà & Tài liệu học tập:
+              </span>
+
+              {selectedDetailSession.homework && (
+                <p className="text-xs text-slate-300 bg-white/5 p-3 rounded-xl border border-white/5">
+                  {selectedDetailSession.homework}
+                </p>
+              )}
+
+              {(() => {
+                const files = selectedDetailSession.homeworkFiles && selectedDetailSession.homeworkFiles.length > 0
+                  ? selectedDetailSession.homeworkFiles
+                  : (selectedDetailSession.homeworkFile ? [selectedDetailSession.homeworkFile] : []);
+
+                if (files.length === 0) {
+                  return !selectedDetailSession.homework ? (
+                    <p className="text-xs text-slate-400 italic bg-white/5 p-3 rounded-xl border border-white/5">
+                      Chưa có tài liệu đính kèm cho buổi này.
+                    </p>
+                  ) : null;
+                }
+
+                return (
+                  <div className="space-y-2 pt-1">
+                    <span className="text-[11px] font-semibold text-slate-400 block">
+                      Tệp tài liệu đính kèm ({files.length} file):
+                    </span>
+                    {files.map((file, fileIdx) => (
+                      <div key={fileIdx} className="flex items-center justify-between bg-purple-500/10 p-3 rounded-xl border border-purple-500/20 text-xs">
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          <Paperclip className="w-4 h-4 text-purple-400 shrink-0" />
+                          <div>
+                            <span className="text-white font-semibold block truncate max-w-[220px]">{file.name}</span>
+                            <span className="text-[10px] text-purple-300/70 block">Dung lượng: {file.size}</span>
+                          </div>
+                        </div>
+                        <a
+                          href={file.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          download
+                          className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Tải File
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="pt-2 flex justify-end gap-2 border-t border-white/5">
+              {selectedDetailSession.status !== "COMPLETED" && !selectedDetailSession.rescheduleRequest && (
+                <button
+                  onClick={() => {
+                    setRescheduleSessionTarget(selectedDetailSession);
+                    setSelectedDetailSession(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold transition"
+                >
+                  Xin Nghỉ / Đổi Lịch
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedDetailSession(null)}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-sm"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* VietQR Modal */}
       {showQRModal && (
@@ -393,87 +550,92 @@ export default function ParentPortalPage() {
               </h3>
 
               <div className="space-y-4">
-                {sessions.map((session, index) => (
-                  <div 
-                    key={session.id}
-                    className={cn(
-                      "glass p-5 rounded-2xl border transition-all",
-                      session.status === "COMPLETED" 
-                        ? "border-emerald-500/20 bg-emerald-950/10" 
-                        : "border-white/5 bg-indigo-500/5"
-                    )}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-3">
-                        <span className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-xs font-bold text-indigo-300">
-                          #{index + 1}
-                        </span>
-                        <div>
-                          <h4 className="font-bold text-white text-base">{session.topic}</h4>
-                          <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                            <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                            {session.date} • {session.time}
-                          </p>
+                {sessions.map((session, index) => {
+                  const files = session.homeworkFiles && session.homeworkFiles.length > 0
+                    ? session.homeworkFiles
+                    : (session.homeworkFile ? [session.homeworkFile] : []);
+                  const hasDetails = session.tutorFeedback || session.homework || files.length > 0;
+
+                  return (
+                    <div 
+                      key={session.id}
+                      onClick={() => setSelectedDetailSession(session)}
+                      className={cn(
+                        "glass p-5 rounded-2xl border transition-all cursor-pointer group hover:scale-[1.005]",
+                        session.status === "COMPLETED" 
+                          ? "border-emerald-500/20 bg-emerald-950/10 hover:border-emerald-500/40" 
+                          : "border-white/5 bg-indigo-500/5 hover:border-indigo-500/30"
+                      )}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-3">
+                          <span className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-xs font-bold text-indigo-300">
+                            #{index + 1}
+                          </span>
+                          <div>
+                            <h4 className="font-bold text-white text-base group-hover:text-indigo-300 transition-colors">
+                              {session.topic}
+                            </h4>
+                            <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                              <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                              {session.date} • {session.time}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-start sm:self-auto" onClick={(e) => e.stopPropagation()}>
+                          {session.testScore !== undefined && (
+                            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                              {session.testScore}/10
+                            </span>
+                          )}
+
+                          <span className={cn(
+                            "text-xs font-bold px-3 py-1 rounded-full border",
+                            session.status === "COMPLETED" 
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                              : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                          )}>
+                            {session.status === "COMPLETED" ? "Đã Hoàn Thành" : "Sắp Diễn Ra"}
+                          </span>
+
+                          {session.status !== "COMPLETED" && !session.rescheduleRequest && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRescheduleSessionTarget(session);
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-semibold transition"
+                            >
+                              Xin Nghỉ / Đổi Lịch
+                            </button>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 self-start sm:self-auto">
-                        {session.testScore !== undefined && (
-                          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                            <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                            {session.testScore}/10
-                          </span>
-                        )}
+                      {session.rescheduleRequest && (
+                        <div className="mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center justify-between">
+                          <span>⏳ Đã gửi yêu cầu đổi lịch: <strong>{session.rescheduleRequest.reason}</strong></span>
+                          <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full font-bold">Chờ Gia sư duyệt</span>
+                        </div>
+                      )}
 
-                        <span className={cn(
-                          "text-xs font-bold px-3 py-1 rounded-full border",
-                          session.status === "COMPLETED" 
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
-                            : "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                        )}>
-                          {session.status === "COMPLETED" ? "Đã Hoàn Thành" : "Sắp Diễn Ra"}
-                        </span>
+                      {/* Session Feedback, Homework & File Attachment */}
+                      {hasDetails && (
+                        <div className="mt-4 pt-4 border-t border-white/5 space-y-3 text-sm">
+                          {session.tutorFeedback && (
+                            <div className="bg-indigo-950/40 p-3.5 rounded-xl border border-indigo-500/20">
+                              <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5 mb-1">
+                                <Award className="w-4 h-4 text-indigo-400" />
+                                Nhận xét từ Gia sư:
+                              </span>
+                              <p className="text-slate-300 text-xs leading-relaxed">{session.tutorFeedback}</p>
+                            </div>
+                          )}
 
-                        {session.status !== "COMPLETED" && !session.rescheduleRequest && (
-                          <button
-                            onClick={() => setRescheduleSessionTarget(session)}
-                            className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-semibold transition"
-                          >
-                            Xin Nghỉ / Đổi Lịch
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {session.rescheduleRequest && (
-                      <div className="mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 flex items-center justify-between">
-                        <span>⏳ Đã gửi yêu cầu đổi lịch: <strong>{session.rescheduleRequest.reason}</strong></span>
-                        <span className="text-[10px] bg-amber-500/20 px-2 py-0.5 rounded-full font-bold">Chờ Gia sư duyệt</span>
-                      </div>
-                    )}
-
-                    {/* Session Feedback, Homework & File Attachment */}
-                    {session.status === "COMPLETED" && (
-                      <div className="mt-4 pt-4 border-t border-white/5 space-y-3 text-sm">
-                        {session.tutorFeedback && (
-                          <div className="bg-indigo-950/40 p-3.5 rounded-xl border border-indigo-500/20">
-                            <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5 mb-1">
-                              <Award className="w-4 h-4 text-indigo-400" />
-                              Nhận xét từ Gia sư:
-                            </span>
-                            <p className="text-slate-300 text-xs leading-relaxed">{session.tutorFeedback}</p>
-                          </div>
-                        )}
-
-                        {(() => {
-                          const files = session.homeworkFiles && session.homeworkFiles.length > 0
-                            ? session.homeworkFiles
-                            : (session.homeworkFile ? [session.homeworkFile] : []);
-
-                          if (!session.homework && files.length === 0) return null;
-
-                          return (
-                            <div className="bg-white/5 p-3.5 rounded-xl border border-white/5 space-y-2">
+                          {(session.homework || files.length > 0) && (
+                            <div className="bg-white/5 p-3.5 rounded-xl border border-white/5 space-y-2" onClick={(e) => e.stopPropagation()}>
                               {session.homework && (
                                 <div>
                                   <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5 mb-1">
@@ -512,12 +674,12 @@ export default function ParentPortalPage() {
                                 </div>
                               )}
                             </div>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </>
