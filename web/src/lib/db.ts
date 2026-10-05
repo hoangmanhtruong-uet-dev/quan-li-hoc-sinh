@@ -664,6 +664,7 @@ export interface MonthlyOutlineItem {
   fileUrl: string;
   fileSize: string;
   createdAt: string;
+  studentHomeworkFile?: StudentHomeworkFile | null;
 }
 
 export async function fetchMonthlyOutlinesFromDB(): Promise<MonthlyOutlineItem[]> {
@@ -675,15 +676,28 @@ export async function fetchMonthlyOutlinesFromDB(): Promise<MonthlyOutlineItem[]
 
     if (error || !data) return [];
 
-    return data.map((mo: any) => ({
-      id: mo.id,
-      studentId: mo.student_id,
-      month: mo.month,
-      fileName: mo.file_name,
-      fileUrl: mo.file_url,
-      fileSize: mo.file_size,
-      createdAt: mo.created_at,
-    }));
+    return data.map((mo: any) => {
+      let studentHomeworkFile = null;
+      if (mo.student_homework_file_url) {
+        studentHomeworkFile = {
+          name: mo.student_homework_file_name,
+          size: mo.student_homework_file_size,
+          url: mo.student_homework_file_url,
+          submittedAt: mo.student_homework_submitted_at,
+        };
+      }
+
+      return {
+        id: mo.id,
+        studentId: mo.student_id,
+        month: mo.month,
+        fileName: mo.file_name,
+        fileUrl: mo.file_url,
+        fileSize: mo.file_size,
+        createdAt: mo.created_at,
+        studentHomeworkFile,
+      };
+    });
   } catch (err) {
     console.error("Failed to fetch monthly outlines:", err);
     return [];
@@ -727,6 +741,34 @@ export async function deleteMonthlyOutlineToDB(outlineId: string): Promise<boole
     return true;
   } catch (err) {
     console.error("Failed to delete monthly outline:", err);
+    return false;
+  }
+}
+
+export async function submitMonthlyOutlineHomeworkToDB(
+  outlineId: string,
+  fileName: string,
+  fileUrl: string,
+  fileSize: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("monthly_outlines")
+      .update({
+        student_homework_file_name: fileName,
+        student_homework_file_url: fileUrl,
+        student_homework_file_size: fileSize,
+        student_homework_submitted_at: new Date().toISOString()
+      })
+      .eq("id", outlineId);
+
+    if (error) {
+      console.error("Error submitMonthlyOutlineHomeworkToDB", error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("submitMonthlyOutlineHomeworkToDB ex", err);
     return false;
   }
 }

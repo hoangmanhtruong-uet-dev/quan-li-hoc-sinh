@@ -372,14 +372,37 @@ export function EditRoadmapModal({ isOpen, student, sessions, monthlyOutlines = 
             
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               {monthlyOutlines.filter(o => o.month === selectedMonth).map(outline => (
-                <div key={outline.id} className="flex items-center gap-2 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/30">
-                  <Paperclip className="w-3.5 h-3.5 text-emerald-400" />
-                  <a href={outline.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-emerald-200 hover:underline max-w-[150px] truncate">
-                    {outline.fileName}
-                  </a>
-                  <button onClick={() => handleDeleteOutline(outline.id)} className="text-red-400 hover:text-red-300 ml-1">
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                <div key={outline.id} className="flex flex-col gap-2 bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-500/30 min-w-[200px]">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Paperclip className="w-3.5 h-3.5 text-emerald-400" />
+                      <a href={outline.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-emerald-200 hover:underline max-w-[150px] truncate">
+                        {outline.fileName}
+                      </a>
+                    </div>
+                    <button onClick={() => handleDeleteOutline(outline.id)} className="text-red-400 hover:text-red-300">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                  
+                  {outline.studentHomeworkFile ? (
+                    <div className="mt-1 p-1.5 bg-emerald-950/40 rounded border border-emerald-500/20 text-[10px]">
+                      <span className="text-emerald-400 font-semibold block mb-1">Học sinh đã nộp bài:</span>
+                      <a 
+                        href={outline.studentHomeworkFile.url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="text-emerald-200 hover:underline flex items-center gap-1 truncate"
+                      >
+                        <Paperclip className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{outline.studentHomeworkFile.name}</span>
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-[10px] text-emerald-500/60 italic">
+                      Học sinh chưa nộp bài
+                    </div>
+                  )}
                 </div>
               ))}
               

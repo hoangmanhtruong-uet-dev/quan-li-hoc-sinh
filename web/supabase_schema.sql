@@ -136,7 +136,7 @@ DROP POLICY IF EXISTS "Anon read student by magic_token" ON public.students;
 CREATE POLICY "Anon read student by magic_token"
   ON public.students
   FOR SELECT
-  TO anon
+  
   USING (magic_token IS NOT NULL);
 
 -- Class Sessions: Anon chỉ đọc sessions của student mà mình đã tra cứu
@@ -144,7 +144,7 @@ DROP POLICY IF EXISTS "Anon read sessions of accessible students" ON public.clas
 CREATE POLICY "Anon read sessions of accessible students"
   ON public.class_sessions
   FOR SELECT
-  TO anon
+  
   USING (
     student_id IN (SELECT id FROM public.students WHERE magic_token IS NOT NULL)
   );
@@ -154,7 +154,7 @@ DROP POLICY IF EXISTS "Anon read invoices of accessible students" ON public.invo
 CREATE POLICY "Anon read invoices of accessible students"
   ON public.invoices
   FOR SELECT
-  TO anon
+  
   USING (
     student_id IN (SELECT id FROM public.students WHERE magic_token IS NOT NULL)
   );
@@ -166,7 +166,7 @@ DROP POLICY IF EXISTS "Anon insert parent_messages" ON public.parent_messages;
 CREATE POLICY "Anon insert parent_messages"
   ON public.parent_messages
   FOR INSERT
-  TO anon
+  
   WITH CHECK (
     student_id IN (SELECT id FROM public.students WHERE magic_token IS NOT NULL)
   );
@@ -176,7 +176,7 @@ DROP POLICY IF EXISTS "Tutor CRUD parent_messages" ON public.parent_messages;
 CREATE POLICY "Tutor CRUD parent_messages"
   ON public.parent_messages
   FOR ALL
-  TO authenticated
+  
   USING (
     student_id IN (SELECT id FROM public.students WHERE tutor_id = auth.uid())
   )
@@ -239,14 +239,14 @@ ALTER TABLE public.monthly_outlines ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS ""Tutor full CRUD on monthly outlines"" ON public.monthly_outlines;
 CREATE POLICY ""Tutor full CRUD on monthly outlines""
   ON public.monthly_outlines FOR ALL
-  TO authenticated
+  
   USING (student_id IN (SELECT id FROM public.students WHERE tutor_id IS NULL OR tutor_id = auth.uid()))
   WITH CHECK (student_id IN (SELECT id FROM public.students WHERE tutor_id IS NULL OR tutor_id = auth.uid()));
 
 DROP POLICY IF EXISTS ""Anon read monthly outlines"" ON public.monthly_outlines;
 CREATE POLICY ""Anon read monthly outlines""
   ON public.monthly_outlines FOR SELECT
-  TO anon
+  
   USING (student_id IN (SELECT id FROM public.students WHERE magic_token IS NOT NULL));
 
 ALTER TABLE public.class_sessions ADD COLUMN IF NOT EXISTS student_homework_file_name TEXT;
@@ -257,6 +257,21 @@ ALTER TABLE public.class_sessions ADD COLUMN IF NOT EXISTS student_homework_subm
 DROP POLICY IF EXISTS ""Anon update sessions for homework"" ON public.class_sessions;
 CREATE POLICY ""Anon update sessions for homework""
   ON public.class_sessions FOR UPDATE
-  TO anon
+  
   USING (student_id IN (SELECT id FROM public.students WHERE magic_token IS NOT NULL))
   WITH CHECK (student_id IN (SELECT id FROM public.students WHERE magic_token IS NOT NULL));
+
+-- ===============================================
+-- 9. N?P B�I T?P �? C��NG CHO H?C SINH
+-- ===============================================
+
+ALTER TABLE public.monthly_outlines ADD COLUMN IF NOT EXISTS student_homework_file_name TEXT;
+ALTER TABLE public.monthly_outlines ADD COLUMN IF NOT EXISTS student_homework_file_url TEXT;
+ALTER TABLE public.monthly_outlines ADD COLUMN IF NOT EXISTS student_homework_file_size TEXT;
+ALTER TABLE public.monthly_outlines ADD COLUMN IF NOT EXISTS student_homework_submitted_at TIMESTAMPTZ;
+
+DROP POLICY IF EXISTS ""Anon update monthly outlines for homework"" ON public.monthly_outlines;
+CREATE POLICY ""Anon update monthly outlines for homework""
+  ON public.monthly_outlines FOR UPDATE
+  USING (true)
+  WITH CHECK (true);

@@ -25,7 +25,7 @@ import {
   BookOpen
 } from "lucide-react";
 import { cn, getCurrentMonthStr, getUpcomingMonthOptions } from "@/lib/utils";
-import { fetchStudentsFromDB, fetchSessionsFromDB, submitRescheduleRequest, submitParentFeedback, submitStudentHomeworkToDB, fetchMonthlyOutlinesFromDB, MonthlyOutlineItem } from "@/lib/db";
+import { fetchStudentsFromDB, fetchSessionsFromDB, submitRescheduleRequest, submitParentFeedback, submitStudentHomeworkToDB, fetchMonthlyOutlinesFromDB, MonthlyOutlineItem, submitMonthlyOutlineHomeworkToDB } from "@/lib/db";
 import { Student } from "@/types/database";
 import { ClassSessionItem } from "@/components/CheckInModal";
 import { StudentProgressChart } from "@/components/StudentProgressChart";
@@ -112,6 +112,38 @@ export default function ParentPortalPage() {
       alert("Đã xảy ra lỗi khi tải file lên.");
     } finally {
       setUploadingHomeworkFor(null);
+      e.target.value = "";
+    }
+  };
+
+  const [uploadingOutlineHomeworkFor, setUploadingOutlineHomeworkFor] = useState<string | null>(null);
+
+  const handleOutlineHomeworkUpload = async (outlineId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingOutlineHomeworkFor(outlineId);
+    try {
+      const results = await uploadHomeworkFilesToStorage(files);
+      if (results.length > 0) {
+        const file = results[0];
+        const success = await submitMonthlyOutlineHomeworkToDB(outlineId, file.name, file.url, file.size);
+        if (success) {
+          // Mutate the outlines using SWR to reflect changes
+          // Fortunately we don't have mutateOutlines exposed directly here.
+          // Let's just reload the page or we should export mutateOutlines?
+          // Since it's a student page, an alert + reload is fine, or we can use SWR global mutate.
+          alert("Nộp bài tập đề cương thành công!");
+          window.location.reload();
+        } else {
+          alert("Lỗi khi nộp bài tập. Vui lòng thử lại.");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Đã xảy ra lỗi khi tải file lên.");
+    } finally {
+      setUploadingOutlineHomeworkFor(null);
       e.target.value = "";
     }
   };
@@ -715,22 +747,75 @@ export default function ParentPortalPage() {
                   </h4>
                   <div className="flex flex-col sm:flex-row gap-3">
                     {monthlyOutlines.filter(o => o.month === selectedMonth).map(outline => (
-                      <div key={outline.id} className="flex items-center justify-between gap-3 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 flex-1">
-                        <div className="flex items-center gap-2 overflow-hidden min-w-0">
-                          <Paperclip className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <span className="text-white font-semibold block truncate text-xs">{outline.fileName}</span>
-                            <span className="text-[10px] text-emerald-300/70 block">Dung lượng: {outline.fileSize}</span>
+                      <div key={outline.id} className="flex flex-col gap-3 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 flex-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                            <Paperclip className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <span className="text-white font-semibold block truncate text-xs">{outline.fileName}</span>
+                              <span className="text-[10px] text-emerald-300/70 block">Dung lượng: {outline.fileSize}</span>
+                            </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadFile(outline.fileUrl, outline.fileName)}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Tải Về
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadFile(outline.fileUrl, outline.fileName)}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          Tải Về
-                        </button>
+                        
+                        {/* Outline Homework Submission Area */}
+                        <div className="pt-2 border-t border-emerald-500/20">
+                          {outline.studentHomeworkFile ? (
+                            <div className="bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-500/20 text-xs">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  Đã nộp bài tập
+                                </span>
+                                <span className="text-[10px] text-emerald-300/80">
+                                  {new Date(outline.studentHomeworkFile.submittedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 overflow-hidden bg-black/20 p-2 rounded-lg border border-emerald-500/20">
+                                <Paperclip className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                <a 
+                                  href={outline.studentHomeworkFile.url} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="text-emerald-200 font-medium truncate hover:underline"
+                                >
+                                  {outline.studentHomeworkFile.name}
+                                </a>
+                              </div>
+                              
+                              <label className="mt-2 flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 cursor-pointer transition text-[11px] font-semibold w-full text-center">
+                                {uploadingOutlineHomeworkFor === outline.id ? "Đang tải lên..." : "Nộp lại bài khác"}
+                                <input 
+                                  type="file"
+                                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
+                                  className="hidden"
+                                  onChange={(e) => handleOutlineHomeworkUpload(outline.id, e)}
+                                  disabled={uploadingOutlineHomeworkFor === outline.id}
+                                />
+                              </label>
+                            </div>
+                          ) : (
+                            <label className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-dashed border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 cursor-pointer transition text-xs font-semibold text-emerald-300 w-full text-center">
+                              <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                              {uploadingOutlineHomeworkFor === outline.id ? "Đang tải bài tập lên..." : "Nộp bài tập đề cương (<= 10MB)"}
+                              <input 
+                                type="file"
+                                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
+                                className="hidden"
+                                onChange={(e) => handleOutlineHomeworkUpload(outline.id, e)}
+                                disabled={uploadingOutlineHomeworkFor === outline.id}
+                              />
+                            </label>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
