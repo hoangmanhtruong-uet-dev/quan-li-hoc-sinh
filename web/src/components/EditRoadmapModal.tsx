@@ -23,21 +23,34 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
 
   useEffect(() => {
     if (isOpen && student) {
+      const scheduled = sessions.filter(s => s.status === 'SCHEDULED');
       const draftKey = `draft-edit-roadmap-${student.id}`;
       const saved = localStorage.getItem(draftKey);
+      
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          setEditingSessions(parsed.editingSessions);
-          setDeletedIds(parsed.deletedIds);
+          const draftSessions: ClassSessionItem[] = parsed.editingSessions || [];
+          const draftDeletedIds: string[] = parsed.deletedIds || [];
+          
+          const draftIds = new Set(draftSessions.map(s => s.id));
+          const deletedIdsSet = new Set(draftDeletedIds);
+          
+          const newFromOutside = scheduled.filter(s => !draftIds.has(s.id) && !deletedIdsSet.has(s.id));
+          
+          const validDraftSessions = draftSessions.filter(s => 
+            s.id.startsWith('new-') || scheduled.some(sch => sch.id === s.id)
+          );
+          
+          setEditingSessions([...validDraftSessions, ...newFromOutside]);
+          setDeletedIds(draftDeletedIds);
           return;
         } catch (e) {
           console.error("Failed to parse edit roadmap draft", e);
         }
       }
       
-      // Keep sessions in their roadmap slot order
-      setEditingSessions(sessions.filter(s => s.status === 'SCHEDULED'));
+      setEditingSessions(scheduled);
       setDeletedIds([]);
     }
   }, [isOpen, student, sessions]);
@@ -262,7 +275,10 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
               Sắp Xếp Chuẩn Lịch
             </button>
             <button
-              onClick={onClose}
+              onClick={() => {
+                if (student) localStorage.removeItem(`draft-edit-roadmap-${student.id}`);
+                onClose();
+              }}
               className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
             >
               <X className="w-5 h-5" />
@@ -452,6 +468,7 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
             {onOpenAddFutureMonth && (
               <button
                 onClick={() => {
+                  if (student) localStorage.removeItem(`draft-edit-roadmap-${student.id}`);
                   onClose();
                   onOpenAddFutureMonth();
                 }}
@@ -467,7 +484,10 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
         {/* Footer */}
         <div className="p-6 border-t border-white/5 flex justify-end gap-3 bg-slate-950/50 rounded-b-2xl">
           <button
-            onClick={onClose}
+            onClick={() => {
+              if (student) localStorage.removeItem(`draft-edit-roadmap-${student.id}`);
+              onClose();
+            }}
             className="px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold transition"
           >
             Hủy
