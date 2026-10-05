@@ -185,3 +185,36 @@ CREATE POLICY "Tutor CRUD parent_messages"
     student_id IN (SELECT id FROM public.students WHERE tutor_id = auth.uid())
   );
 
+-- ================================================
+-- 7. CẤU HÌNH SUPABASE STORAGE BUCKET 'homework-files'
+-- Copy đoạn này vào Supabase SQL Editor để bật Storage Public & Cấp quyền tải file
+-- ================================================
+
+-- Tạo Bucket 'homework-files' công khai (Public)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('homework-files', 'homework-files', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Cho phép tất cả mọi người đọc/tải file từ bucket homework-files
+DROP POLICY IF EXISTS "Public Read Access for homework-files" ON storage.objects;
+CREATE POLICY "Public Read Access for homework-files"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'homework-files');
+
+-- Cho phép upload file vào bucket homework-files
+DROP POLICY IF EXISTS "Public Upload Access for homework-files" ON storage.objects;
+CREATE POLICY "Public Upload Access for homework-files"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'homework-files');
+
+DROP POLICY IF EXISTS "Public Update Access for homework-files" ON storage.objects;
+CREATE POLICY "Public Update Access for homework-files"
+  ON storage.objects FOR UPDATE
+  USING (bucket_id = 'homework-files');
+
+DROP POLICY IF EXISTS "Public Delete Access for homework-files" ON storage.objects;
+CREATE POLICY "Public Delete Access for homework-files"
+  ON storage.objects FOR DELETE
+  USING (bucket_id = 'homework-files');
+
+

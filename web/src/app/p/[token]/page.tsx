@@ -30,6 +30,8 @@ import { PrintableReportModal } from "@/components/PrintableReportModal";
 import { RescheduleModal } from "@/components/RescheduleModal";
 import { useParams } from "next/navigation";
 
+import { handleDownloadFile } from "@/lib/storage";
+
 export default function ParentPortalPage() {
   const params = useParams();
   const token = params?.token as string;
@@ -270,16 +272,14 @@ export default function ParentPortalPage() {
                             <span className="text-[10px] text-purple-300/70 block">Dung lượng: {file.size}</span>
                           </div>
                         </div>
-                        <a
-                          href={file.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          download
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadFile(file.url, file.name)}
                           className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0"
                         >
                           <Download className="w-3.5 h-3.5" />
                           Tải File
-                        </a>
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -659,16 +659,17 @@ export default function ParentPortalPage() {
                                         <span className="text-xs text-white font-medium truncate">{file.name}</span>
                                         <span className="text-[10px] text-purple-300/80 shrink-0">({file.size})</span>
                                       </div>
-                                      <a
-                                        href={file.url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        download
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDownloadFile(file.url, file.name);
+                                        }}
                                         className="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-semibold flex items-center gap-1 transition shrink-0"
                                       >
                                         <Download className="w-3 h-3" />
                                         Tải Đề Bài
-                                      </a>
+                                      </button>
                                     </div>
                                   ))}
                                 </div>
