@@ -53,7 +53,10 @@ export function AddFutureMonthRoadmapModal({ isOpen, student, onClose, onSave }:
   const monthOptions = getUpcomingMonthOptions(6);
   const [selectedMonth, setSelectedMonth] = useState(getNextMonthStr());
   const [selectedDays, setSelectedDays] = useState<string[]>(["Thứ 2", "Thứ 7"]);
-  const [scheduleTime, setScheduleTime] = useState("19:30 - 21:30");
+  const [scheduleTimes, setScheduleTimes] = useState<Record<string, string>>({
+    "Thứ 2": "19:30 - 21:30",
+    "Thứ 7": "17:00 - 19:00",
+  });
   const [editingSessions, setEditingSessions] = useState<ClassSessionItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
@@ -62,13 +65,13 @@ export function AddFutureMonthRoadmapModal({ isOpen, student, onClose, onSave }:
     if (isOpen && student) {
       setSelectedMonth(getNextMonthStr());
       // Regenerate dates for next month
-      generateDefaultSessions(getNextMonthStr(), selectedDays, scheduleTime);
+      generateDefaultSessions(getNextMonthStr(), selectedDays, scheduleTimes);
     }
   }, [isOpen, student]);
 
   if (!isOpen || !student) return null;
 
-  const generateDefaultSessions = (monthStr: string, days: string[], timeStr: string) => {
+  const generateDefaultSessions = (monthStr: string, days: string[], times: Record<string, string>) => {
     const dates = generateDatesForMonth(monthStr, days);
     const suggestions = defaultRoadmapSuggestions[student.subject] || defaultRoadmapSuggestions["Hóa học"];
 
@@ -79,7 +82,7 @@ export function AddFutureMonthRoadmapModal({ isOpen, student, onClose, onSave }:
       topic: suggestions[idx % suggestions.length] || `Bài ${idx + 1}: Chuyên đề ${student.subject}`,
       roadmapTopic: suggestions[idx % suggestions.length] || `Bài ${idx + 1}: Chuyên đề ${student.subject}`,
       date: d.dateStr,
-      time: timeStr,
+      time: times[d.dayOfWeek] || "19:30 - 21:30",
       month: monthStr,
       status: "SCHEDULED",
     }));
@@ -89,7 +92,7 @@ export function AddFutureMonthRoadmapModal({ isOpen, student, onClose, onSave }:
 
   const handleMonthChange = (newMonth: string) => {
     setSelectedMonth(newMonth);
-    generateDefaultSessions(newMonth, selectedDays, scheduleTime);
+    generateDefaultSessions(newMonth, selectedDays, scheduleTimes);
   };
 
   const toggleDay = (day: string) => {
@@ -97,7 +100,20 @@ export function AddFutureMonthRoadmapModal({ isOpen, student, onClose, onSave }:
       ? selectedDays.filter((d) => d !== day)
       : [...selectedDays, day];
     setSelectedDays(nextDays);
-    generateDefaultSessions(selectedMonth, nextDays, scheduleTime);
+    
+    const nextTimes = { ...scheduleTimes };
+    if (!nextTimes[day] && !selectedDays.includes(day)) {
+      nextTimes[day] = "19:30 - 21:30";
+    }
+    setScheduleTimes(nextTimes);
+
+    generateDefaultSessions(selectedMonth, nextDays, nextTimes);
+  };
+
+  const handleTimeChange = (day: string, time: string) => {
+    const nextTimes = { ...scheduleTimes, [day]: time };
+    setScheduleTimes(nextTimes);
+    generateDefaultSessions(selectedMonth, selectedDays, nextTimes);
   };
 
   const handleMoveUp = (index: number) => {
@@ -159,6 +175,7 @@ export function AddFutureMonthRoadmapModal({ isOpen, student, onClose, onSave }:
   };
 
   const handleAddCustomSession = () => {
+    const defaultTime = Object.values(scheduleTimes)[0] || "19:30 - 21:30";
     const newSession: ClassSessionItem = {
       id: `new-${Date.now()}`,
       student: student.name,
@@ -166,7 +183,7 @@ export function AddFutureMonthRoadmapModal({ isOpen, student, onClose, onSave }:
       topic: `Bài bổ sung ${editingSessions.length + 1}`,
       roadmapTopic: `Bài bổ sung ${editingSessions.length + 1}`,
       date: "",
-      time: scheduleTime,
+      time: defaultTime,
       month: selectedMonth,
       status: "SCHEDULED",
     };
@@ -257,44 +274,53 @@ export function AddFutureMonthRoadmapModal({ isOpen, student, onClose, onSave }:
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-purple-400" />
-                Khung Giờ Dạy Cố Định
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Chọn Các Ngày Dạy Cố Định Trong Tuần:
               </label>
-              <input
-                type="text"
-                value={scheduleTime}
-                onChange={(e) => setScheduleTime(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white font-medium text-sm focus:outline-none focus:border-indigo-500"
-                placeholder="19:30 - 21:30"
-              />
+              <div className="flex flex-wrap gap-2">
+                {daysOfWeekList.map((day) => {
+                  const isSelected = selectedDays.includes(day);
+                  return (
+                    <button
+                      type="button"
+                      key={day}
+                      onClick={() => toggleDay(day)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                        isSelected
+                          ? "bg-indigo-600 text-white shadow-md border border-indigo-400/40"
+                          : "bg-white/5 hover:bg-white/10 text-slate-400 border border-white/5"
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-              Chọn Các Ngày Dạy Cố Định Trong Tuần (Tự động sinh ngày chuẩn):
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {daysOfWeekList.map((day) => {
-                const isSelected = selectedDays.includes(day);
-                return (
-                  <button
-                    type="button"
-                    key={day}
-                    onClick={() => toggleDay(day)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                      isSelected
-                        ? "bg-indigo-600 text-white shadow-md border border-indigo-400/40"
-                        : "bg-white/5 hover:bg-white/10 text-slate-400 border border-white/5"
-                    }`}
-                  >
-                    {day}
-                  </button>
-                );
-              })}
+          {selectedDays.length > 0 && (
+            <div className="pt-3 border-t border-white/5">
+              <label className="block text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-purple-400" />
+                Khung Giờ Tương Ứng:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {selectedDays.map(day => (
+                  <div key={day} className="flex items-center gap-2 bg-slate-900 border border-white/5 p-2 rounded-xl">
+                    <span className="text-xs font-bold text-indigo-300 w-16 text-center shrink-0">{day}</span>
+                    <input
+                      type="text"
+                      value={scheduleTimes[day] || ""}
+                      onChange={(e) => handleTimeChange(day, e.target.value)}
+                      className="w-full bg-transparent border-none text-white text-xs font-medium focus:outline-none placeholder:text-slate-500"
+                      placeholder="Ví dụ: 19:30 - 21:30"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Sessions List */}
