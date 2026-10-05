@@ -308,11 +308,13 @@ export async function updateRoadmapSessionsInDB(updatedSessions: ClassSessionIte
       }
     }
 
-    // 2. Update existing and Insert new
-    const upsertData = updatedSessions.map(s => {
-      const data: any = {
-        student_name: s.student,
-        subject: s.subject,
+    // 2. Separate existing sessions to update vs new sessions to insert
+    const existingSessions = updatedSessions.filter(s => !s.id.startsWith("new-"));
+    const newSessions = updatedSessions.filter(s => s.id.startsWith("new-"));
+
+    // Update existing sessions using .update() to avoid upsert NOT NULL constraint errors
+    for (const s of existingSessions) {
+      const updateData: any = {
         topic: s.topic,
         roadmap_topic: s.roadmapTopic || s.topic,
         date: s.date,
@@ -320,46 +322,41 @@ export async function updateRoadmapSessionsInDB(updatedSessions: ClassSessionIte
         status: s.status,
         ...formatHomeworkFilesForDB(s),
       };
-      
-      // If it's an existing session, we pass the UUID
-      if (!s.id.startsWith("new-")) {
-        data.id = s.id;
-      }
-      return data;
-    });
 
-    // We can't just upsert without student_id for new sessions.
-    // Let's separate updates and inserts.
-    const toUpdate = upsertData.filter(d => d.id);
-    const toInsert = upsertData.filter(d => !d.id);
-
-    if (toUpdate.length > 0) {
       const { error: updateErr } = await supabase
         .from("class_sessions")
-        .upsert(toUpdate, { onConflict: 'id' });
-        
+        .update(updateData)
+        .eq("id", s.id);
+
       if (updateErr) {
-        console.error("Error updating sessions:", updateErr);
+        console.error("Error updating session:", s.id, updateErr);
         return false;
       }
     }
 
-    if (toInsert.length > 0) {
-      // Find student_id
-      const studentName = toInsert[0].student_name;
+    // Insert new sessions if any
+    if (newSessions.length > 0) {
+      const studentName = newSessions[0].student;
       const { data: stData } = await supabase.from("students").select("id").eq("name", studentName).single();
-      
+
       if (stData) {
-        const inserts = toInsert.map(d => ({
-          ...d,
+        const inserts = newSessions.map(s => ({
           student_id: stData.id,
-          month: getCurrentMonthStr() // or calculate based on the date
+          student_name: s.student,
+          subject: s.subject,
+          topic: s.topic,
+          roadmap_topic: s.roadmapTopic || s.topic,
+          date: s.date,
+          time: s.time,
+          month: s.month || getCurrentMonthStr(),
+          status: s.status || "SCHEDULED",
+          ...formatHomeworkFilesForDB(s),
         }));
-        
+
         const { error: insertErr } = await supabase
           .from("class_sessions")
           .insert(inserts);
-          
+
         if (insertErr) {
           console.error("Error inserting new sessions:", insertErr);
           return false;
