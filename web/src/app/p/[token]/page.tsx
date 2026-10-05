@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import useSWR from "swr";
+import Image from "next/image";
 import { 
   GraduationCap, 
   Calendar, 
@@ -37,9 +39,12 @@ export default function ParentPortalPage() {
   const token = params?.token as string;
 
   const [copied, setCopied] = useState(false);
-  const [student, setStudent] = useState<Student | null>(null);
-  const [sessions, setSessions] = useState<ClassSessionItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: allStudents, mutate: mutateStudents } = useSWR<Student[]>('students', fetchStudentsFromDB, { revalidateOnFocus: false });
+  const { data: allSessions, mutate: mutateSessions } = useSWR<ClassSessionItem[]>('sessions', fetchSessionsFromDB, { revalidateOnFocus: false });
+
+  const student = (allStudents || []).find((s) => s.id === token || s.magicToken === token) || null;
+  const sessions = student ? (allSessions || []).filter((cs) => cs.student === student.name) : [];
+  const loading = !allStudents || !allSessions;
 
   // VietQR Modal State
   const [showQRModal, setShowQRModal] = useState(false);
@@ -57,25 +62,6 @@ export default function ParentPortalPage() {
 
   // Session Detail Modal State for Parent
   const [selectedDetailSession, setSelectedDetailSession] = useState<ClassSessionItem | null>(null);
-
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      const allStudents = await fetchStudentsFromDB();
-      const allSessions = await fetchSessionsFromDB();
-
-      // Find student matching token — NEVER fall back to another student
-      const matchedStudent = allStudents.find((s) => s.id === token || s.magicToken === token) || null;
-      setStudent(matchedStudent);
-
-      if (matchedStudent) {
-        const studentSessions = allSessions.filter((cs) => cs.student === matchedStudent.name);
-        setSessions(studentSessions);
-      }
-      setLoading(false);
-    }
-    loadData();
-  }, [token]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -114,7 +100,7 @@ export default function ParentPortalPage() {
     const success = await submitRescheduleRequest(sessionId, requestPayload);
     
     if (success) {
-      setSessions((prev) =>
+      mutateSessions((prev = []) =>
         prev.map((s) => {
           if (s.id === sessionId) {
             return {
@@ -124,7 +110,7 @@ export default function ParentPortalPage() {
           }
           return s;
         })
-      );
+      , { revalidate: false });
     } else {
       alert("Đã xảy ra lỗi khi gửi yêu cầu đổi lịch. Vui lòng thử lại sau.");
     }
@@ -340,9 +326,11 @@ export default function ParentPortalPage() {
             </div>
 
             <div className="bg-white p-3 rounded-2xl border border-white/10 inline-block mx-auto shadow-inner">
-              <img 
+              <Image 
                 src="/qr-hoangmanhtruong.png" 
                 alt={`Mã QR Nhận Tiền ${tutorName}`} 
+                width={224}
+                height={224}
                 className="w-56 h-56 object-contain mx-auto rounded-lg"
               />
             </div>

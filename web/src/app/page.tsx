@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import useSWR from "swr";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   BookOpen, 
@@ -87,15 +88,44 @@ export default function Dashboard() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<ClassSessionItem | null>(null);
   
-  // Real Database State
-  const [students, setStudents] = useState<Student[]>([]);
-  const [upcomingClasses, setUpcomingClasses] = useState<ClassSessionItem[]>([]);
+  // Real Database State (SWR)
+  const { data: dbStudents, mutate: mutateStudents } = useSWR('students', fetchStudentsFromDB, { revalidateOnFocus: false });
+  const { data: dbSessions, mutate: mutateSessions } = useSWR('sessions', fetchSessionsFromDB, { revalidateOnFocus: false });
+  const { data: dbMessages, mutate: mutateMessages } = useSWR('parent_messages', fetchParentMessagesFromDB, { revalidateOnFocus: false });
+
+  const students = dbStudents || [];
+  const parentMessages = dbMessages || [];
+  const upcomingClasses = (dbSessions || []).map((s) => ({
+    ...s,
+    icon: getSubjectIcon(s.subject),
+  }));
+  const loading = !dbStudents || !dbSessions;
+
+  // Drop-in compatible optimistic update setters
+  const setStudents = (updater: Student[] | ((prev: Student[]) => Student[])) => {
+    mutateStudents((prev = []) => typeof updater === 'function' ? updater(prev) : updater, { revalidate: false });
+  };
   
+  const setParentMessages = (updater: ParentMessageItem[] | ((prev: ParentMessageItem[]) => ParentMessageItem[])) => {
+    mutateMessages((prev = []) => typeof updater === 'function' ? updater(prev) : updater, { revalidate: false });
+  };
+
+  const setUpcomingClasses = (updater: ClassSessionItem[] | ((prev: ClassSessionItem[]) => ClassSessionItem[])) => {
+    mutateSessions((prev = []) => {
+      const mapped = prev.map(s => ({ ...s, icon: getSubjectIcon(s.subject) }));
+      const nextMapped = typeof updater === 'function' ? updater(mapped) : updater;
+      // Strip icon back out for SWR cache
+      return nextMapped.map((item: any) => {
+        const { icon, ...rest } = item;
+        return rest;
+      });
+    }, { revalidate: false });
+  };
+
   // Filters
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>("Tất cả");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("Tất cả");
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
 
   // Paid Status Tracking per Student (Local UI state / Syncable)
   const [paidStatusMap, setPaidStatusMap] = useState<Record<string, boolean>>({});
@@ -118,7 +148,6 @@ export default function Dashboard() {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   // Parent Messages State & Modal
-  const [parentMessages, setParentMessages] = useState<ParentMessageItem[]>([]);
   const [showParentMessagesModal, setShowParentMessagesModal] = useState(false);
 
   // Reschedule Requests Drawer State
@@ -131,39 +160,52 @@ export default function Dashboard() {
       newSessions
     );
     if (created && created.length > 0) {
-      setUpcomingClasses((prev) => [...prev, ...created]);
+      setUpcomingClasses((prev: ClassSessionItem[]) => [...prev, ...created]);
     }
     setIsAddFutureMonthOpen(false);
     setSelectedFutureMonthStudent(null);
   };
 
-  // Load Real Data from Supabase DB on startup + get current user
   useEffect(() => {
-    async function loadDBData() {
-      setLoading(true);
+    const supabase = createSupabaseBrowserClient();
 
-      // Get logged-in user email
-      const supabase = createSupabaseBrowserClient();
+    async function loadUser() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.email) setUserEmail(user.email);
-
-      const dbStudents = await fetchStudentsFromDB();
-      const dbSessions = await fetchSessionsFromDB();
-      const dbMessages = await fetchParentMessagesFromDB();
-
-      setStudents(dbStudents);
-      setParentMessages(dbMessages);
-      
-      const mappedSessions = dbSessions.map((s) => ({
-        ...s,
-        icon: getSubjectIcon(s.subject),
-      }));
-
-      setUpcomingClasses(mappedSessions);
-      setLoading(false);
     }
-    loadDBData();
-  }, []);
+    loadUser();
+
+    // Set up Realtime subscriptions to automatically trigger SWR revalidation
+    const channel = supabase.channel('dashboard-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'class_sessions' },
+        () => {
+          // Revalidate sessions in background when DB changes
+          mutateSessions(undefined, { revalidate: true });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'parent_messages' },
+        () => {
+          // Revalidate messages in background when DB changes
+          mutateMessages(undefined, { revalidate: true });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'students' },
+        () => {
+          mutateStudents(undefined, { revalidate: true });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [mutateSessions, mutateMessages, mutateStudents]);
 
   const pendingRescheduleCount = upcomingClasses.filter(
     (c) => c.rescheduleRequest && c.rescheduleRequest.status === "PENDING"

@@ -6,6 +6,7 @@ import { Student, Subject } from "@/types/database";
 import { ClassSessionItem } from "./CheckInModal";
 import { generateDatesForMonth, getUpcomingMonthOptions, getNextMonthStr } from "@/lib/utils";
 import { uploadHomeworkFilesToStorage } from "@/lib/storage";
+import { FutureMonthSessionList } from "./roadmap/FutureMonthSessionList";
 
 interface AddFutureMonthRoadmapModalProps {
   isOpen: boolean;
@@ -325,109 +326,17 @@ export function AddFutureMonthRoadmapModal({ isOpen, student, onClose, onSave }:
 
         {/* Sessions List */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
-          {editingSessions.map((session, index) => {
-            const files = session.homeworkFiles && session.homeworkFiles.length > 0
-              ? session.homeworkFiles
-              : (session.homeworkFile ? [session.homeworkFile] : []);
-
-            return (
-              <div key={session.id} className="flex flex-col md:flex-row gap-4 bg-white/5 p-4 rounded-xl border border-white/10 items-start">
-                <div className="flex-1 space-y-2 w-full">
-                  <label className="text-xs text-slate-400 font-semibold">Tên bài học #{index + 1}</label>
-                  <input
-                    type="text"
-                    value={session.topic}
-                    onChange={(e) => handleUpdateTopic(index, e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
-                    placeholder="VD: Cấu tạo nguyên tử"
-                  />
-
-                  {/* File uploads */}
-                  <div className="space-y-1 pt-1">
-                    {files.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {files.map((file, fileIdx) => (
-                          <div key={fileIdx} className="inline-flex items-center gap-1.5 bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded-md text-xs text-purple-200">
-                            <Paperclip className="w-3 h-3 text-purple-400 shrink-0" />
-                            <span className="truncate max-w-[140px] font-medium text-purple-300">{file.name}</span>
-                            <span className="text-[10px] text-purple-300/70">({file.size})</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <label className="inline-flex items-center gap-1.5 text-xs text-purple-300 hover:text-purple-200 cursor-pointer w-fit bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 px-2.5 py-1 rounded-md transition mt-1">
-                      <Upload className="w-3.5 h-3.5 text-purple-400" />
-                      {uploadingIdx === index ? "Đang tải file..." : "Đính kèm bài tập (nhiều file, <=10MB)"}
-                      <input
-                        type="file"
-                        multiple
-                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
-                        className="hidden"
-                        disabled={uploadingIdx === index}
-                        onChange={(e) => handleFileUpload(index, e)}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="w-full md:w-36 space-y-1">
-                  <label className="text-xs text-slate-400 font-semibold">Ngày học</label>
-                  <input
-                    type="text"
-                    value={session.date}
-                    onChange={(e) => handleUpdateDate(index, e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-indigo-500 font-medium"
-                    placeholder="VD: Thứ 2, 02/11"
-                  />
-                </div>
-
-                <div className="w-full md:w-36 space-y-1">
-                  <label className="text-xs text-slate-400 font-semibold">Giờ học</label>
-                  <input
-                    type="text"
-                    value={session.time}
-                    onChange={(e) => handleUpdateTime(index, e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-lg text-xs text-white focus:outline-none focus:border-indigo-500 font-medium"
-                    placeholder="19:30 - 21:30"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 self-start md:self-end pt-1 md:pt-6 shrink-0">
-                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-white/10">
-                    <button
-                      type="button"
-                      disabled={index === 0}
-                      onClick={() => handleMoveUp(index)}
-                      className="p-1.5 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 disabled:opacity-30 transition"
-                      title="Đổi vị trí LÊN TRÊN (giữ nguyên ngày giờ)"
-                    >
-                      <ArrowUp className="w-4 h-4" />
-                    </button>
-                    <span className="text-[11px] font-bold text-slate-300 px-1">#{index + 1}</span>
-                    <button
-                      type="button"
-                      disabled={index === editingSessions.length - 1}
-                      onClick={() => handleMoveDown(index)}
-                      className="p-1.5 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 disabled:opacity-30 transition"
-                      title="Đổi vị trí XUỐNG DƯỚI (giữ nguyên ngày giờ)"
-                    >
-                      <ArrowDown className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveSession(index)}
-                    className="p-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg border border-red-500/20 transition"
-                    title="Xóa buổi này"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+          <FutureMonthSessionList
+            sessions={editingSessions}
+            uploadingIdx={uploadingIdx}
+            onUpdateTopic={handleUpdateTopic}
+            onUpdateDate={handleUpdateDate}
+            onUpdateTime={handleUpdateTime}
+            onMoveUp={handleMoveUp}
+            onMoveDown={handleMoveDown}
+            onRemove={handleRemoveSession}
+            onFileUpload={handleFileUpload}
+          />
 
           <button
             onClick={handleAddCustomSession}

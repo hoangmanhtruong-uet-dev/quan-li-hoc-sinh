@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { X, CheckCircle2, Download, Copy, Check, QrCode, Send, Sparkles, ShieldCheck } from "lucide-react";
 import { Student } from "@/types/database";
 
@@ -87,9 +88,11 @@ export function ZaloReceiptModal({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center bg-white/5 p-4 rounded-xl border border-white/5">
           <div className="text-center space-y-2">
             <div className="bg-white p-2.5 rounded-xl inline-block shadow-lg border border-white/20">
-              <img
+              <Image
                 src="/qr-hoangmanhtruong.png"
                 alt={`Mã VietQR ${tutorName}`}
+                width={144}
+                height={144}
                 className="w-36 h-36 object-contain mx-auto rounded-md"
               />
             </div>
