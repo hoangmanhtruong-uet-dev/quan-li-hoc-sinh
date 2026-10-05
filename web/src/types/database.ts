@@ -5,6 +5,7 @@ export interface Student {
   name: string;
   grade: string;
   phone?: string;
+  parentName?: string;
   parentPhone?: string;
   hourlyRate: number;
   subject: Subject;

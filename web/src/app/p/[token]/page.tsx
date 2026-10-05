@@ -487,9 +487,12 @@ export default function ParentPortalPage() {
                     Môn {student.subject} • {student.grade}
                   </div>
                   <h2 className="text-2xl font-bold text-white">{student.name}</h2>
-                  <p className="text-sm text-slate-400 mt-1 flex items-center gap-2">
-                    Gia sư phụ trách: <span className="text-white font-medium">{tutorName}</span>
-                  </p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 mt-1">
+                    {student.parentName && (
+                      <span className="text-indigo-300 font-medium">Phụ huynh: <strong className="text-white">{student.parentName}</strong></span>
+                    )}
+                    <span>Gia sư phụ trách: <strong className="text-white">{tutorName}</strong></span>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">

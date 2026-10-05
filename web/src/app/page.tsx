@@ -41,6 +41,7 @@ import { AddStudentModal, NewStudentPayload } from "@/components/AddStudentModal
 import { CheckInModal, ClassSessionItem } from "@/components/CheckInModal";
 import { ZaloReceiptModal } from "@/components/ZaloReceiptModal";
 import { EditRoadmapModal } from "@/components/EditRoadmapModal";
+import { EditStudentModal } from "@/components/EditStudentModal";
 import { Student } from "@/types/database";
 import { 
   fetchStudentsFromDB, 
@@ -49,7 +50,8 @@ import {
   updateSessionCheckInInDB,
   deleteStudentFromDB,
   processRescheduleRequest,
-  updateRoadmapSessionsInDB
+  updateRoadmapSessionsInDB,
+  updateStudentInDB
 } from "@/lib/db";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -101,6 +103,10 @@ export default function Dashboard() {
   // Edit Roadmap State
   const [isEditRoadmapOpen, setIsEditRoadmapOpen] = useState(false);
   const [selectedRoadmapStudent, setSelectedRoadmapStudent] = useState<Student | null>(null);
+
+  // Edit Student Details State
+  const [isEditStudentOpen, setIsEditStudentOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   // Reschedule Requests Drawer State
   const [showRescheduleDrawer, setShowRescheduleDrawer] = useState(false);
@@ -233,6 +239,37 @@ export default function Dashboard() {
     }
   };
 
+  // Save Edited Student Info
+  const handleSaveStudentInfo = async (updatedStudent: Student) => {
+    const success = await updateStudentInDB(updatedStudent);
+    if (!success) {
+      alert("Lỗi khi cập nhật thông tin học sinh. Vui lòng thử lại.");
+      return;
+    }
+
+    setStudents((prev) =>
+      prev.map((s) => (s.id === updatedStudent.id ? updatedStudent : s))
+    );
+
+    // Also update session items if student name or subject changed
+    setUpcomingClasses((prev) =>
+      prev.map((cs) => {
+        if (editingStudent && cs.student === editingStudent.name) {
+          return {
+            ...cs,
+            student: updatedStudent.name,
+            subject: updatedStudent.subject,
+            icon: getSubjectIcon(updatedStudent.subject),
+          };
+        }
+        return cs;
+      })
+    );
+
+    setIsEditStudentOpen(false);
+    setEditingStudent(null);
+  };
+
   // Delete Student
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
     if (confirm(`Bạn có chắc chắn muốn xóa học sinh "${studentName}" và toàn bộ lộ trình?`)) {
@@ -311,6 +348,16 @@ export default function Dashboard() {
           setSelectedRoadmapStudent(null);
         }}
         onSave={handleSaveRoadmap}
+      />
+
+      <EditStudentModal
+        isOpen={isEditStudentOpen}
+        student={editingStudent}
+        onClose={() => {
+          setIsEditStudentOpen(false);
+          setEditingStudent(null);
+        }}
+        onSaveStudent={handleSaveStudentInfo}
       />
 
       <CheckInModal
@@ -937,16 +984,35 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleDeleteStudent(st.id, st.name)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition"
-                      title="Xóa học sinh này"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setEditingStudent(st);
+                          setIsEditStudentOpen(true);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition"
+                        title="Sửa thông tin học sinh & lớp"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteStudent(st.id, st.name)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition"
+                        title="Xóa học sinh này"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-2 pt-2 border-t border-white/5 text-xs text-slate-300">
+                    {st.parentName && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Phụ huynh (Bố/Mẹ):</span>
+                        <span className="font-semibold text-white">{st.parentName}</span>
+                      </div>
+                    )}
+
                     <div className="flex justify-between">
                       <span className="text-slate-400">Học phí / Buổi:</span>
                       <span className="font-bold text-amber-400">{(st.hourlyRate / 1000).toLocaleString()}k VNĐ</span>
@@ -969,16 +1035,29 @@ export default function Dashboard() {
                   </div>
 
                   <div className="pt-2 space-y-2">
-                    <button
-                      onClick={() => {
-                        setSelectedRoadmapStudent(st);
-                        setIsEditRoadmapOpen(true);
-                      }}
-                      className="w-full py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold flex items-center justify-center gap-2 transition"
-                    >
-                      <BookOpen className="w-4 h-4" />
-                      Sửa Lộ Trình Học
-                    </button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingStudent(st);
+                          setIsEditStudentOpen(true);
+                        }}
+                        className="py-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        Sửa Thông Tin
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setSelectedRoadmapStudent(st);
+                          setIsEditRoadmapOpen(true);
+                        }}
+                        className="py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        Sửa Lộ Trình
+                      </button>
+                    </div>
 
                     <button
                       onClick={() => handleCopyMagicLink(st.magicToken || st.id, st.name)}

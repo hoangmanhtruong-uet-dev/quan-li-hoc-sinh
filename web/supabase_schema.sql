@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.students (
     name TEXT NOT NULL,
     grade TEXT NOT NULL,
     subject TEXT NOT NULL,
+    parent_name TEXT,
     parent_phone TEXT NOT NULL,
     hourly_rate NUMERIC(12, 2) NOT NULL DEFAULT 200000,
     schedule_days TEXT,
@@ -22,8 +23,9 @@ CREATE TABLE IF NOT EXISTS public.students (
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Thêm cột tutor_id cho DB đã tồn tại (Schema Upgrade)
+-- Thêm các cột cho DB đã tồn tại (Schema Upgrade)
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS tutor_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS parent_name TEXT;
 
 -- 3. Bảng buổi học (class_sessions)
 CREATE TABLE IF NOT EXISTS public.class_sessions (

@@ -25,6 +25,7 @@ export async function fetchStudentsFromDB(): Promise<Student[]> {
       name: s.name,
       grade: s.grade,
       subject: s.subject as any,
+      parentName: s.parent_name || undefined,
       parentPhone: s.parent_phone,
       hourlyRate: Number(s.hourly_rate) || 200000,
       createdAt: s.created_at,
@@ -50,6 +51,7 @@ export async function fetchStudentsByPhoneFromDB(phone: string): Promise<Student
       name: s.name,
       grade: s.grade,
       subject: s.subject as any,
+      parentName: s.parent_name || undefined,
       parentPhone: s.parent_phone,
       hourlyRate: Number(s.hourly_rate) || 200000,
       createdAt: s.created_at,
@@ -133,6 +135,7 @@ export async function insertStudentWithRoadmapToDB(payload: NewStudentPayload): 
       name: payload.name,
       grade: payload.grade,
       subject: payload.subject,
+      parent_name: payload.parentName || null,
       parent_phone: payload.parentPhone,
       hourly_rate: payload.hourlyRate,
       schedule_days: payload.scheduleDays.join(", "),
@@ -158,6 +161,7 @@ export async function insertStudentWithRoadmapToDB(payload: NewStudentPayload): 
       name: studentData.name,
       grade: studentData.grade,
       subject: studentData.subject,
+      parentName: studentData.parent_name || undefined,
       parentPhone: studentData.parent_phone,
       hourlyRate: Number(studentData.hourly_rate),
       createdAt: studentData.created_at,
@@ -225,6 +229,45 @@ export async function deleteStudentFromDB(studentId: string): Promise<boolean> {
     return true;
   } catch (err) {
     console.error("Failed to delete student:", err);
+    return false;
+  }
+}
+
+export async function updateStudentInDB(updatedStudent: Student): Promise<boolean> {
+  try {
+    const { error: studentErr } = await supabase
+      .from("students")
+      .update({
+        name: updatedStudent.name,
+        grade: updatedStudent.grade,
+        subject: updatedStudent.subject,
+        parent_name: updatedStudent.parentName || null,
+        parent_phone: updatedStudent.parentPhone || "",
+        hourly_rate: updatedStudent.hourlyRate,
+      })
+      .eq("id", updatedStudent.id);
+
+    if (studentErr) {
+      console.error("Error updating student in Supabase:", studentErr);
+      return false;
+    }
+
+    // Also update student_name & subject in class_sessions to keep session records consistent
+    const { error: sessionsErr } = await supabase
+      .from("class_sessions")
+      .update({
+        student_name: updatedStudent.name,
+        subject: updatedStudent.subject,
+      })
+      .eq("student_id", updatedStudent.id);
+
+    if (sessionsErr) {
+      console.warn("Warning updating sessions student_name:", sessionsErr);
+    }
+
+    return true;
+  } catch (err) {
+    console.error("Failed to update student in DB:", err);
     return false;
   }
 }

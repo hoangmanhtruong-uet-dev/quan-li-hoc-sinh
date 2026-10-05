@@ -70,6 +70,7 @@ export function AddStudentModal({ isOpen, onClose, onAddStudent }: AddStudentMod
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("Lớp 12");
   const [subject, setSubject] = useState<Subject>("Hóa học");
+  const [parentName, setParentName] = useState("");
   const [parentPhone, setParentPhone] = useState("");
   const [hourlyRate, setHourlyRate] = useState("200000");
   const [selectedDays, setSelectedDays] = useState<string[]>(["Thứ 2", "Thứ 7"]);
@@ -200,6 +201,7 @@ export function AddStudentModal({ isOpen, onClose, onAddStudent }: AddStudentMod
       name,
       grade,
       subject,
+      parentName,
       parentPhone,
       hourlyRate: Number(hourlyRate) || 0,
       scheduleDays: selectedDays,
@@ -209,6 +211,8 @@ export function AddStudentModal({ isOpen, onClose, onAddStudent }: AddStudentMod
 
     // Reset Form
     setName("");
+    setParentName("");
+    setParentPhone("");
     setStep(1);
     onClose();
   };
@@ -346,17 +350,30 @@ export function AddStudentModal({ isOpen, onClose, onAddStudent }: AddStudentMod
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">SĐT Phụ Huynh (Nhận báo cáo Zalo)</label>
-              <div className="relative">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Tên Phụ Huynh (Bố/Mẹ)</label>
                 <input
-                  type="tel"
-                  placeholder="0987xxxxxx"
-                  value={parentPhone}
-                  onChange={(e) => setParentPhone(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm font-medium"
+                  type="text"
+                  placeholder="VD: Chị Mai / Anh Hùng"
+                  value={parentName}
+                  onChange={(e) => setParentName(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm font-medium"
                 />
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">SĐT Phụ Huynh (Nhận báo cáo Zalo)</label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    placeholder="0987xxxxxx"
+                    value={parentPhone}
+                    onChange={(e) => setParentPhone(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm font-medium"
+                  />
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                </div>
               </div>
             </div>
 
