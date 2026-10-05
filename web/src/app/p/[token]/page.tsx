@@ -505,11 +505,11 @@ export default function ParentPortalPage() {
                   </button>
 
                   <a
-                    href={`tel:0912345678`}
+                    href={`tel:0968544769`}
                     className="py-2.5 px-3.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition text-center"
                   >
                     <PhoneCall className="w-4 h-4 shrink-0" />
-                    <span>Gọi Gia Sư</span>
+                    <span>Gọi Gia Sư (0968544769)</span>
                   </a>
                 </div>
               </div>

@@ -34,7 +34,8 @@ import {
   Filter,
   X,
   QrCode,
-  LogOut
+  LogOut,
+  MessageSquare
 } from "lucide-react";
 import { cn, getCurrentMonthStr } from "@/lib/utils";
 import { AddStudentModal, NewStudentPayload } from "@/components/AddStudentModal";
@@ -51,7 +52,9 @@ import {
   deleteStudentFromDB,
   processRescheduleRequest,
   updateRoadmapSessionsInDB,
-  updateStudentInDB
+  updateStudentInDB,
+  fetchParentMessagesFromDB,
+  ParentMessageItem
 } from "@/lib/db";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -108,6 +111,10 @@ export default function Dashboard() {
   const [isEditStudentOpen, setIsEditStudentOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
+  // Parent Messages State & Modal
+  const [parentMessages, setParentMessages] = useState<ParentMessageItem[]>([]);
+  const [showParentMessagesModal, setShowParentMessagesModal] = useState(false);
+
   // Reschedule Requests Drawer State
   const [showRescheduleDrawer, setShowRescheduleDrawer] = useState(false);
 
@@ -123,8 +130,10 @@ export default function Dashboard() {
 
       const dbStudents = await fetchStudentsFromDB();
       const dbSessions = await fetchSessionsFromDB();
+      const dbMessages = await fetchParentMessagesFromDB();
 
       setStudents(dbStudents);
+      setParentMessages(dbMessages);
       
       const mappedSessions = dbSessions.map((s) => ({
         ...s,
@@ -382,6 +391,52 @@ export default function Dashboard() {
         />
       )}
 
+      {/* Parent Messages Modal for Tutor */}
+      {showParentMessagesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="glass w-full max-w-lg rounded-2xl p-6 relative shadow-2xl border border-white/10 space-y-4 max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setShowParentMessagesModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-white/5 pb-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Lời Nhắn Từ Phụ Huynh ({parentMessages.length})</h3>
+                <p className="text-xs text-slate-400">Danh sách các dặn dò / phản hồi trực tiếp từ phụ huynh</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {parentMessages.map((pm) => (
+                <div key={pm.id} className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-indigo-300">Học sinh: {pm.studentName}</span>
+                    <span className="text-[10px] text-slate-400">
+                      {new Date(pm.createdAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
+                    </span>
+                  </div>
+                  <div className="bg-slate-900/60 p-3 rounded-lg border border-white/5 text-xs text-slate-200 leading-relaxed">
+                    💬 "{pm.message}"
+                  </div>
+                </div>
+              ))}
+
+              {parentMessages.length === 0 && (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  Chưa có lời nhắn nào từ Phụ huynh.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Reschedule Requests Drawer */}
       {showRescheduleDrawer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
@@ -549,6 +604,14 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={() => setShowParentMessagesModal(true)}
+              className="px-3.5 py-2.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center gap-2 transition"
+            >
+              <MessageSquare className="w-4 h-4 text-indigo-400" />
+              {parentMessages.length > 0 ? `${parentMessages.length} Lời nhắn từ PH` : "Lời nhắn PH"}
+            </button>
+
             {pendingRescheduleCount > 0 && (
               <button
                 onClick={() => setShowRescheduleDrawer(true)}

@@ -531,6 +531,15 @@ export async function processRescheduleRequest(sessionId: string, isApproved: bo
 // FEEDBACK API
 // ===============================================
 
+export interface ParentMessageItem {
+  id: string;
+  studentId: string;
+  studentName?: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export async function submitParentFeedback(studentId: string, message: string): Promise<boolean> {
   try {
     const { error } = await supabase
@@ -549,6 +558,47 @@ export async function submitParentFeedback(studentId: string, message: string): 
     return true;
   } catch (err) {
     console.error("Failed to submit parent feedback:", err);
+    return false;
+  }
+}
+
+export async function fetchParentMessagesFromDB(): Promise<ParentMessageItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from("parent_messages")
+      .select("*, students(name)")
+      .order("created_at", { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map((pm: any) => ({
+      id: pm.id,
+      studentId: pm.student_id,
+      studentName: pm.students?.name || "Học sinh",
+      message: pm.message,
+      isRead: pm.is_read || false,
+      createdAt: pm.created_at,
+    }));
+  } catch (err) {
+    console.error("Failed to fetch parent messages:", err);
+    return [];
+  }
+}
+
+export async function markParentMessageAsReadInDB(messageId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("parent_messages")
+      .update({ is_read: true })
+      .eq("id", messageId);
+
+    if (error) {
+      console.error("Error marking parent message as read:", error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Failed to mark parent message as read:", err);
     return false;
   }
 }
