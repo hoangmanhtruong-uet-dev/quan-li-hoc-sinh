@@ -4,7 +4,7 @@ import { ClassSessionItem } from "./CheckInModal";
 import { Student } from "@/types/database";
 import { uploadHomeworkFilesToStorage } from "@/lib/storage";
 import { parseSessionDateWeight } from "@/lib/db";
-import { generateDatesForMonth, getCurrentMonthStr } from "@/lib/utils";
+import { generateDatesForMonth, getCurrentMonthStr, getUpcomingMonthOptions, cn } from "@/lib/utils";
 
 interface EditRoadmapModalProps {
   isOpen: boolean;
@@ -23,27 +23,79 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
 
   useEffect(() => {
     if (isOpen && student) {
+      const draftKey = `draft-edit-roadmap-${student.id}`;
+      const saved = localStorage.getItem(draftKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setEditingSessions(parsed.editingSessions);
+          setDeletedIds(parsed.deletedIds);
+          return;
+        } catch (e) {
+          console.error("Failed to parse edit roadmap draft", e);
+        }
+      }
+      
       // Keep sessions in their roadmap slot order
       setEditingSessions(sessions.filter(s => s.status === 'SCHEDULED'));
       setDeletedIds([]);
     }
   }, [isOpen, student, sessions]);
 
+  // Save to draft whenever state changes
+  useEffect(() => {
+    if (isOpen && student && (editingSessions.length > 0 || deletedIds.length > 0)) {
+      const draftKey = `draft-edit-roadmap-${student.id}`;
+      localStorage.setItem(draftKey, JSON.stringify({
+        editingSessions,
+        deletedIds
+      }));
+    }
+  }, [editingSessions, deletedIds, isOpen, student]);
+
+  const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
+
   if (!isOpen || !student) return null;
 
+  const upcoming5Months = getUpcomingMonthOptions(5);
+  const sessionMonths = sessions.map((s) => s.month).filter(Boolean);
+  const availableMonths = Array.from(new Set([...upcoming5Months, ...sessionMonths])).sort((a, b) => {
+    const parseMonth = (str: string) => {
+      const parts = str.replace("Tháng ", "").split("/");
+      return { m: parseInt(parts[0], 10), y: parseInt(parts[1], 10) };
+    };
+    const dateA = parseMonth(a);
+    const dateB = parseMonth(b);
+    if (dateA.y !== dateB.y) return dateA.y - dateB.y;
+    return dateA.m - dateB.m;
+  });
+
+  const displayedSessions = selectedMonth === "ALL" 
+    ? editingSessions 
+    : editingSessions.filter((s) => s.month === selectedMonth);
+
   const reassignDates = (list: ClassSessionItem[]) => {
-    if (list.length === 0) return list;
-    const monthStr = list[0].month || getCurrentMonthStr();
-    const generatedDates = generateDatesForMonth(monthStr, ["Thứ 2", "Thứ 7"]);
-    return list.map((s, idx) => {
-      const generatedDate = generatedDates[idx];
+    const datesPerMonth: Record<string, { dates: any[], used: number }> = {};
+    
+    return list.map(s => {
+      const m = s.month || getCurrentMonthStr();
+      if (!datesPerMonth[m]) {
+        datesPerMonth[m] = {
+          dates: generateDatesForMonth(m, ["Thứ 2", "Thứ 7"]),
+          used: 0
+        };
+      }
+      
+      const pool = datesPerMonth[m];
+      const generatedDate = pool.dates[pool.used];
       if (generatedDate) {
+        pool.used++;
         const isT2 = generatedDate.dayOfWeek === "Thứ 2" || generatedDate.dayOfWeek.includes("2");
         return {
           ...s,
           date: generatedDate.dateStr,
           time: isT2 ? "19:30 - 21:30" : "17:00 - 19:00",
-          month: monthStr,
+          month: m,
         };
       }
       return s;
@@ -54,24 +106,48 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
     setEditingSessions((prev) => reassignDates(prev));
   };
 
-  const handleMoveUp = (index: number) => {
-    if (index <= 0) return;
+  const handleMoveUp = (id: string) => {
     setEditingSessions((prev) => {
+      const idx = prev.findIndex(s => s.id === id);
+      if (idx === -1) return prev;
+      
+      let targetIdx = -1;
+      for (let i = idx - 1; i >= 0; i--) {
+        if (selectedMonth === "ALL" || prev[i].month === selectedMonth) {
+          targetIdx = i;
+          break;
+        }
+      }
+      if (targetIdx === -1) return prev;
+
       const next = [...prev];
-      const temp = next[index];
-      next[index] = next[index - 1];
-      next[index - 1] = temp;
+      const temp = next[idx];
+      next[idx] = next[targetIdx];
+      next[targetIdx] = temp;
+      
       return reassignDates(next);
     });
   };
 
-  const handleMoveDown = (index: number) => {
-    if (index >= editingSessions.length - 1) return;
+  const handleMoveDown = (id: string) => {
     setEditingSessions((prev) => {
+      const idx = prev.findIndex(s => s.id === id);
+      if (idx === -1) return prev;
+
+      let targetIdx = -1;
+      for (let i = idx + 1; i < prev.length; i++) {
+        if (selectedMonth === "ALL" || prev[i].month === selectedMonth) {
+          targetIdx = i;
+          break;
+        }
+      }
+      if (targetIdx === -1) return prev;
+
       const next = [...prev];
-      const temp = next[index];
-      next[index] = next[index + 1];
-      next[index + 1] = temp;
+      const temp = next[idx];
+      next[idx] = next[targetIdx];
+      next[targetIdx] = temp;
+      
       return reassignDates(next);
     });
   };
@@ -135,6 +211,7 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
   };
 
   const handleAddSession = () => {
+    const defaultMonth = selectedMonth === "ALL" ? getCurrentMonthStr() : selectedMonth;
     const newSession: ClassSessionItem = {
       id: `new-${Date.now()}`,
       student: student.name,
@@ -143,7 +220,7 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
       roadmapTopic: "Bài mới",
       date: "",
       time: "19h30 - 21h30",
-      month: "", // will be calculated on backend
+      month: defaultMonth, // will be calculated on backend
       status: "SCHEDULED",
     };
     setEditingSessions([...editingSessions, newSession]);
@@ -152,6 +229,11 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
   const handleSave = async () => {
     setIsSaving(true);
     await onSave(editingSessions, deletedIds);
+    
+    if (student) {
+      localStorage.removeItem(`draft-edit-roadmap-${student.id}`);
+    }
+    
     setIsSaving(false);
     onClose();
   };
@@ -188,14 +270,52 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
           </div>
         </div>
 
+        {/* Month Filter Taskbar */}
+        {availableMonths.length > 0 && (
+          <div className="px-6 py-3 border-b border-white/5 bg-slate-950/30 flex items-center gap-2 overflow-x-auto scrollbar-none">
+            <button
+              onClick={() => setSelectedMonth("ALL")}
+              className={cn(
+                "px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap border shrink-0",
+                selectedMonth === "ALL"
+                  ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                  : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+              )}
+            >
+              Tất cả ({editingSessions.length})
+            </button>
+            {availableMonths.map((m) => {
+              const count = editingSessions.filter((s) => s.month === m).length;
+              return (
+                <button
+                  key={m}
+                  onClick={() => setSelectedMonth(m)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap border shrink-0 flex items-center gap-1.5",
+                    selectedMonth === m
+                      ? "bg-indigo-600 text-white border-indigo-400 shadow-md"
+                      : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                  )}
+                >
+                  <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                  {m} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {editingSessions.length === 0 ? (
+          {displayedSessions.length === 0 ? (
             <div className="text-center p-8 text-slate-400">
-              Học sinh này không có buổi học nào sắp tới.
+              Không có buổi học nào trong {selectedMonth}.
             </div>
           ) : (
-            editingSessions.map((session, index) => {
+            displayedSessions.map((session, visibleIndex) => {
+              // Calculate if it's the first or last in the filtered view for disabling Up/Down
+              const isFirst = visibleIndex === 0;
+              const isLast = visibleIndex === displayedSessions.length - 1;
               const files = session.homeworkFiles && session.homeworkFiles.length > 0
                 ? session.homeworkFiles
                 : (session.homeworkFile ? [session.homeworkFile] : []);
@@ -287,18 +407,18 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave, o
                   <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-white/10">
                     <button
                       type="button"
-                      disabled={index === 0}
-                      onClick={() => handleMoveUp(index)}
+                      disabled={isFirst}
+                      onClick={() => handleMoveUp(session.id)}
                       className="p-1.5 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 disabled:opacity-30 disabled:hover:bg-indigo-500/10 transition"
                       title="Đổi vị trí LÊN TRÊN (tự động giữ nguyên khung ngày giờ)"
                     >
                       <ArrowUp className="w-4 h-4" />
                     </button>
-                    <span className="text-[11px] font-bold text-slate-300 px-1">#{index + 1}</span>
+                    <span className="text-[11px] font-bold text-slate-300 px-1">#{visibleIndex + 1}</span>
                     <button
                       type="button"
-                      disabled={index === editingSessions.length - 1}
-                      onClick={() => handleMoveDown(index)}
+                      disabled={isLast}
+                      onClick={() => handleMoveDown(session.id)}
                       className="p-1.5 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 disabled:opacity-30 disabled:hover:bg-indigo-500/10 transition"
                       title="Đổi vị trí XUỐNG DƯỚI (tự động giữ nguyên khung ngày giờ)"
                     >

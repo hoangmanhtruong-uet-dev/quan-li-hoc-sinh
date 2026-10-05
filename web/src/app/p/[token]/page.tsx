@@ -23,7 +23,7 @@ import {
   Printer,
   Trophy
 } from "lucide-react";
-import { cn, getCurrentMonthStr } from "@/lib/utils";
+import { cn, getCurrentMonthStr, getUpcomingMonthOptions } from "@/lib/utils";
 import { fetchStudentsFromDB, fetchSessionsFromDB, submitRescheduleRequest, submitParentFeedback } from "@/lib/db";
 import { Student } from "@/types/database";
 import { ClassSessionItem } from "@/components/CheckInModal";
@@ -119,7 +119,18 @@ export default function ParentPortalPage() {
   // Month Filter State for Parent
   const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
 
-  const availableMonths = Array.from(new Set(sessions.map((s) => s.month).filter(Boolean)));
+  const upcoming5Months = getUpcomingMonthOptions(5);
+  const sessionMonths = sessions.map((s) => s.month).filter(Boolean);
+  const availableMonths = Array.from(new Set([...upcoming5Months, ...sessionMonths])).sort((a, b) => {
+    const parseMonth = (str: string) => {
+      const parts = str.replace("Tháng ", "").split("/");
+      return { m: parseInt(parts[0], 10), y: parseInt(parts[1], 10) };
+    };
+    const dateA = parseMonth(a);
+    const dateB = parseMonth(b);
+    if (dateA.y !== dateB.y) return dateA.y - dateB.y;
+    return dateA.m - dateB.m;
+  });
 
   const displayedSessions = selectedMonth === "ALL" 
     ? sessions 

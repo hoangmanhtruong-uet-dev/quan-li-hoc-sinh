@@ -64,11 +64,48 @@ export function AddFutureMonthRoadmapModal({ isOpen, student, onClose, onSave }:
 
   useEffect(() => {
     if (isOpen && student) {
-      setSelectedMonth(getNextMonthStr());
+      const draftKey = `draft-add-roadmap-${student.id}`;
+      const saved = localStorage.getItem(draftKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setSelectedMonth(parsed.selectedMonth);
+          setSelectedDays(parsed.selectedDays);
+          setScheduleTimes(parsed.scheduleTimes);
+          setEditingSessions(parsed.editingSessions);
+          return;
+        } catch (e) {
+          console.error("Failed to parse draft", e);
+        }
+      }
+
+      const nextM = getNextMonthStr();
+      setSelectedMonth(nextM);
+      setSelectedDays(["Thứ 2", "Thứ 7"]);
+      setScheduleTimes({
+        "Thứ 2": "19:30 - 21:30",
+        "Thứ 7": "17:00 - 19:00",
+      });
       // Regenerate dates for next month
-      generateDefaultSessions(getNextMonthStr(), selectedDays, scheduleTimes);
+      generateDefaultSessions(nextM, ["Thứ 2", "Thứ 7"], {
+        "Thứ 2": "19:30 - 21:30",
+        "Thứ 7": "17:00 - 19:00",
+      });
     }
   }, [isOpen, student]);
+
+  // Save to draft whenever state changes
+  useEffect(() => {
+    if (isOpen && student && editingSessions.length > 0) {
+      const draftKey = `draft-add-roadmap-${student.id}`;
+      localStorage.setItem(draftKey, JSON.stringify({
+        selectedMonth,
+        selectedDays,
+        scheduleTimes,
+        editingSessions
+      }));
+    }
+  }, [selectedMonth, selectedDays, scheduleTimes, editingSessions, isOpen, student]);
 
   if (!isOpen || !student) return null;
 
@@ -225,6 +262,11 @@ export function AddFutureMonthRoadmapModal({ isOpen, student, onClose, onSave }:
 
     setIsSaving(true);
     await onSave(editingSessions);
+    
+    if (student) {
+      localStorage.removeItem(`draft-add-roadmap-${student.id}`);
+    }
+    
     setIsSaving(false);
     onClose();
   };
