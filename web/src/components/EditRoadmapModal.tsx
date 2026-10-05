@@ -361,7 +361,7 @@ export function EditRoadmapModal({ isOpen, student, sessions, monthlyOutlines = 
         )}
 
         {selectedMonth !== "ALL" && (
-          <div className="px-6 py-3 bg-emerald-950/20 border-b border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="px-6 py-4 bg-emerald-950/20 border-b border-emerald-500/20 flex flex-col gap-3">
             <div>
               <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
                 <BookOpen className="w-4 h-4" />
@@ -370,7 +370,7 @@ export function EditRoadmapModal({ isOpen, student, sessions, monthlyOutlines = 
               <p className="text-[10px] text-emerald-300/70 mt-0.5">Tải lên đề cương để phụ huynh/học sinh tải về xem</p>
             </div>
             
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {monthlyOutlines.filter(o => o.month === selectedMonth).map(outline => (
                 <div key={outline.id} className="flex flex-col gap-2 bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-500/30 min-w-[200px]">
                   <div className="flex items-center justify-between gap-2">
