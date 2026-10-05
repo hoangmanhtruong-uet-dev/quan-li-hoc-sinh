@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Save, Trash2, Plus, Calendar, Clock, BookOpen, Upload, Paperclip } from "lucide-react";
+import { X, Save, Trash2, Plus, Calendar, Clock, BookOpen, Upload, Paperclip, ArrowUp, ArrowDown } from "lucide-react";
 import { ClassSessionItem } from "./CheckInModal";
 import { Student } from "@/types/database";
 import { uploadHomeworkFilesToStorage } from "@/lib/storage";
@@ -20,14 +20,53 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
 
   useEffect(() => {
     if (isOpen && student) {
-      // Sort sessions by date or just keep them as is (assuming they are ordered)
-      // Only edit SCHEDULED sessions
+      // Keep sessions in their roadmap slot order
       setEditingSessions(sessions.filter(s => s.status === 'SCHEDULED'));
       setDeletedIds([]);
     }
   }, [isOpen, student, sessions]);
 
   if (!isOpen || !student) return null;
+
+  const handleMoveUp = (index: number) => {
+    if (index <= 0) return;
+    setEditingSessions(prev => {
+      const next = [...prev];
+      // Swap date and time to preserve schedule timeline slots
+      const tempDate = next[index].date;
+      const tempTime = next[index].time;
+      next[index].date = next[index - 1].date;
+      next[index].time = next[index - 1].time;
+      next[index - 1].date = tempDate;
+      next[index - 1].time = tempTime;
+
+      // Swap positions in array
+      const temp = next[index];
+      next[index] = next[index - 1];
+      next[index - 1] = temp;
+      return next;
+    });
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index >= editingSessions.length - 1) return;
+    setEditingSessions(prev => {
+      const next = [...prev];
+      // Swap date and time to preserve schedule timeline slots
+      const tempDate = next[index].date;
+      const tempTime = next[index].time;
+      next[index].date = next[index + 1].date;
+      next[index].time = next[index + 1].time;
+      next[index + 1].date = tempDate;
+      next[index + 1].time = tempTime;
+
+      // Swap positions in array
+      const temp = next[index];
+      next[index] = next[index + 1];
+      next[index + 1] = temp;
+      return next;
+    });
+  };
 
   const handleUpdateSession = (id: string, field: keyof ClassSessionItem, value: any) => {
     setEditingSessions(prev => 
@@ -226,8 +265,31 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
                   </div>
                 </div>
 
-                <div className="flex items-end pt-6">
+                <div className="flex items-center gap-2.5 self-start md:self-end pt-1 md:pt-6 shrink-0">
+                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-white/10">
+                    <button
+                      type="button"
+                      disabled={index === 0}
+                      onClick={() => handleMoveUp(index)}
+                      className="p-1.5 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 disabled:opacity-30 disabled:hover:bg-indigo-500/10 transition"
+                      title="Đổi vị trí LÊN TRÊN (tự động giữ nguyên khung ngày giờ)"
+                    >
+                      <ArrowUp className="w-4 h-4" />
+                    </button>
+                    <span className="text-[11px] font-bold text-slate-300 px-1">#{index + 1}</span>
+                    <button
+                      type="button"
+                      disabled={index === editingSessions.length - 1}
+                      onClick={() => handleMoveDown(index)}
+                      className="p-1.5 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 disabled:opacity-30 disabled:hover:bg-indigo-500/10 transition"
+                      title="Đổi vị trí XUỐNG DƯỚI (tự động giữ nguyên khung ngày giờ)"
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                    </button>
+                  </div>
+
                   <button
+                    type="button"
                     onClick={() => handleDeleteSession(session.id)}
                     className="p-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg border border-red-500/20 transition"
                     title="Xóa buổi này"

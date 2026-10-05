@@ -347,13 +347,7 @@ export async function fetchSessionsFromDB(): Promise<ClassSessionItem[]> {
       };
     });
 
-    // Sort chronologically by class date (e.g. 05/10 < 12/10 < 19/10 < 26/10)
-    return sessions.sort((a, b) => {
-      const wA = parseSessionDateWeight(a.date);
-      const wB = parseSessionDateWeight(b.date);
-      if (wA !== wB && wA > 0 && wB > 0) return wA - wB;
-      return 0;
-    });
+    return sessions;
   } catch (err) {
     console.error("Failed to fetch sessions:", err);
     return [];
