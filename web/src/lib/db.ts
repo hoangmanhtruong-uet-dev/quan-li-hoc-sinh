@@ -306,18 +306,29 @@ export async function updateStudentInDB(updatedStudent: Student): Promise<boolea
 // CLASS SESSIONS DATABASE API
 // ===============================================
 
+export function parseSessionDateWeight(dateStr: string): number {
+  if (!dateStr) return 0;
+  const match = dateStr.match(/(\d{1,2})\/(\d{1,2})/);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    return month * 100 + day;
+  }
+  return 0;
+}
+
 export async function fetchSessionsFromDB(): Promise<ClassSessionItem[]> {
   try {
     const { data, error } = await supabase
       .from("class_sessions")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: true });
 
     if (error || !data || data.length === 0) {
       return [];
     }
 
-    return data.map((cs) => {
+    const sessions = data.map((cs) => {
       const files = parseHomeworkFilesFromDB(cs);
       return {
         id: cs.id,
@@ -334,6 +345,14 @@ export async function fetchSessionsFromDB(): Promise<ClassSessionItem[]> {
         homeworkFile: files.length > 0 ? files[0] : null,
         tutorFeedback: cs.tutor_feedback,
       };
+    });
+
+    // Sort chronologically by class date (e.g. 05/10 < 12/10 < 19/10 < 26/10)
+    return sessions.sort((a, b) => {
+      const wA = parseSessionDateWeight(a.date);
+      const wB = parseSessionDateWeight(b.date);
+      if (wA !== wB && wA > 0 && wB > 0) return wA - wB;
+      return 0;
     });
   } catch (err) {
     console.error("Failed to fetch sessions:", err);
