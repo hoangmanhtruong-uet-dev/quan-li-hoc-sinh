@@ -88,6 +88,55 @@ export function parseHomeworkFilesFromDB(cs: any): { name: string; url: string; 
   }];
 }
 
+export function parseStudentHomeworkFilesFromDB(cs: any): StudentHomeworkFile[] {
+  if (!cs.student_homework_file_url && !cs.student_homework_file_name) return [];
+
+  if (cs.student_homework_file_url && cs.student_homework_file_url.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(cs.student_homework_file_url);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    } catch {
+      // Fallback if JSON parse fails
+    }
+  }
+
+  return [{
+    name: cs.student_homework_file_name || "File bài tập",
+    url: cs.student_homework_file_url || "#",
+    size: cs.student_homework_file_size || "1 MB",
+    submittedAt: cs.student_homework_submitted_at || new Date().toISOString(),
+  }];
+}
+
+export function formatStudentHomeworkFilesForDB(files: StudentHomeworkFile[]) {
+  if (!files || files.length === 0) {
+    return {
+      student_homework_file_name: null,
+      student_homework_file_url: null,
+      student_homework_file_size: null,
+      student_homework_submitted_at: null,
+    };
+  }
+
+  if (files.length === 1) {
+    return {
+      student_homework_file_name: files[0].name,
+      student_homework_file_url: files[0].url,
+      student_homework_file_size: files[0].size,
+      student_homework_submitted_at: files[0].submittedAt,
+    };
+  }
+
+  return {
+    student_homework_file_name: `${files.length} file đính kèm`,
+    student_homework_file_url: JSON.stringify(files),
+    student_homework_file_size: files.map((f) => f.size).join(", "),
+    student_homework_submitted_at: files[0].submittedAt,
+  };
+}
+
 export function formatHomeworkFilesForDB(session: {
   homeworkFiles?: { name: string; url: string; size: string }[] | null;
   homeworkFile?: { name: string; url: string; size: string } | null;
@@ -330,6 +379,7 @@ export async function fetchSessionsFromDB(): Promise<ClassSessionItem[]> {
 
     const sessions = data.map((cs) => {
       const files = parseHomeworkFilesFromDB(cs);
+      const studentFiles = parseStudentHomeworkFilesFromDB(cs);
       return {
         id: cs.id,
         student: cs.student_name,
@@ -344,12 +394,8 @@ export async function fetchSessionsFromDB(): Promise<ClassSessionItem[]> {
         homeworkFiles: files.length > 0 ? files : null,
         homeworkFile: files.length > 0 ? files[0] : null,
         tutorFeedback: cs.tutor_feedback,
-        studentHomeworkFile: cs.student_homework_file_url ? {
-          name: cs.student_homework_file_name,
-          url: cs.student_homework_file_url,
-          size: cs.student_homework_file_size,
-          submittedAt: cs.student_homework_submitted_at,
-        } : null,
+        studentHomeworkFiles: studentFiles.length > 0 ? studentFiles : null,
+        studentHomeworkFile: studentFiles.length > 0 ? studentFiles[0] : null,
       };
     });
 
@@ -665,6 +711,7 @@ export interface MonthlyOutlineItem {
   fileSize: string;
   createdAt: string;
   studentHomeworkFile?: StudentHomeworkFile | null;
+  studentHomeworkFiles?: StudentHomeworkFile[] | null;
 }
 
 export async function fetchMonthlyOutlinesFromDB(): Promise<MonthlyOutlineItem[]> {
@@ -677,15 +724,7 @@ export async function fetchMonthlyOutlinesFromDB(): Promise<MonthlyOutlineItem[]
     if (error || !data) return [];
 
     return data.map((mo: any) => {
-      let studentHomeworkFile = null;
-      if (mo.student_homework_file_url) {
-        studentHomeworkFile = {
-          name: mo.student_homework_file_name,
-          size: mo.student_homework_file_size,
-          url: mo.student_homework_file_url,
-          submittedAt: mo.student_homework_submitted_at,
-        };
-      }
+      const studentFiles = parseStudentHomeworkFilesFromDB(mo);
 
       return {
         id: mo.id,
@@ -695,7 +734,8 @@ export async function fetchMonthlyOutlinesFromDB(): Promise<MonthlyOutlineItem[]
         fileUrl: mo.file_url,
         fileSize: mo.file_size,
         createdAt: mo.created_at,
-        studentHomeworkFile,
+        studentHomeworkFiles: studentFiles.length > 0 ? studentFiles : null,
+        studentHomeworkFile: studentFiles.length > 0 ? studentFiles[0] : null,
       };
     });
   } catch (err) {
@@ -747,19 +787,12 @@ export async function deleteMonthlyOutlineToDB(outlineId: string): Promise<boole
 
 export async function submitMonthlyOutlineHomeworkToDB(
   outlineId: string,
-  fileName: string,
-  fileUrl: string,
-  fileSize: string
+  files: StudentHomeworkFile[]
 ): Promise<boolean> {
   try {
     const { error } = await supabase
       .from("monthly_outlines")
-      .update({
-        student_homework_file_name: fileName,
-        student_homework_file_url: fileUrl,
-        student_homework_file_size: fileSize,
-        student_homework_submitted_at: new Date().toISOString()
-      })
+      .update(formatStudentHomeworkFilesForDB(files))
       .eq("id", outlineId);
 
     if (error) {
@@ -777,16 +810,11 @@ export async function submitMonthlyOutlineHomeworkToDB(
 // STUDENT HOMEWORK SUBMISSION API
 // ===============================================
 
-export async function submitStudentHomeworkToDB(sessionId: string, fileName: string, fileUrl: string, fileSize: string): Promise<boolean> {
+export async function submitStudentHomeworkToDB(sessionId: string, files: StudentHomeworkFile[]): Promise<boolean> {
   try {
     const { error } = await supabase
       .from("class_sessions")
-      .update({
-        student_homework_file_name: fileName,
-        student_homework_file_url: fileUrl,
-        student_homework_file_size: fileSize,
-        student_homework_submitted_at: new Date().toISOString(),
-      })
+      .update(formatStudentHomeworkFilesForDB(files))
       .eq("id", sessionId);
 
     if (error) {

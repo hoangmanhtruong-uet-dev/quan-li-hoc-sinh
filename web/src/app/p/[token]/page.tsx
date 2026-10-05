@@ -27,7 +27,7 @@ import {
 import { cn, getCurrentMonthStr, getUpcomingMonthOptions } from "@/lib/utils";
 import { fetchStudentsFromDB, fetchSessionsFromDB, submitRescheduleRequest, submitParentFeedback, submitStudentHomeworkToDB, fetchMonthlyOutlinesFromDB, MonthlyOutlineItem, submitMonthlyOutlineHomeworkToDB } from "@/lib/db";
 import { Student } from "@/types/database";
-import { ClassSessionItem } from "@/components/CheckInModal";
+import { ClassSessionItem, StudentHomeworkFile } from "@/components/CheckInModal";
 import { StudentProgressChart } from "@/components/StudentProgressChart";
 import { PrintableReportModal } from "@/components/PrintableReportModal";
 import { RescheduleModal } from "@/components/RescheduleModal";
@@ -78,20 +78,16 @@ export default function ParentPortalPage() {
     try {
       const results = await uploadHomeworkFilesToStorage(files);
       if (results.length > 0) {
-        const file = results[0];
-        const success = await submitStudentHomeworkToDB(sessionId, file.name, file.url, file.size);
+        const studentFiles = results.map(r => ({ ...r, submittedAt: new Date().toISOString() }));
+        const success = await submitStudentHomeworkToDB(sessionId, studentFiles);
         if (success) {
           mutateSessions((prev = []) =>
             prev.map((s) => {
               if (s.id === sessionId) {
                 const updatedSession = {
                   ...s,
-                  studentHomeworkFile: {
-                    name: file.name,
-                    size: file.size,
-                    url: file.url,
-                    submittedAt: new Date().toISOString(),
-                  },
+                  studentHomeworkFiles: studentFiles,
+                  studentHomeworkFile: studentFiles[0],
                 };
                 // Update selected detail session if it's the current one
                 if (selectedDetailSession?.id === sessionId) {
@@ -126,8 +122,8 @@ export default function ParentPortalPage() {
     try {
       const results = await uploadHomeworkFilesToStorage(files);
       if (results.length > 0) {
-        const file = results[0];
-        const success = await submitMonthlyOutlineHomeworkToDB(outlineId, file.name, file.url, file.size);
+        const studentFiles = results.map(r => ({ ...r, submittedAt: new Date().toISOString() }));
+        const success = await submitMonthlyOutlineHomeworkToDB(outlineId, studentFiles);
         if (success) {
           // Mutate the outlines using SWR to reflect changes
           // Fortunately we don't have mutateOutlines exposed directly here.
@@ -386,54 +382,71 @@ export default function ParentPortalPage() {
                 Nộp bài tập cho Gia sư:
               </span>
               
-              {selectedDetailSession.studentHomeworkFile ? (
-                <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/30 text-xs">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Đã nộp bài tập
-                    </span>
-                    <span className="text-[10px] text-emerald-300/80">
-                      {new Date(selectedDetailSession.studentHomeworkFile.submittedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 overflow-hidden bg-emerald-950/40 p-2 rounded-lg border border-emerald-500/20">
-                    <Paperclip className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <a 
-                      href={selectedDetailSession.studentHomeworkFile.url} 
-                      target="_blank" 
-                      rel="noreferrer" 
-                      className="text-emerald-200 font-medium truncate hover:underline"
-                    >
-                      {selectedDetailSession.studentHomeworkFile.name}
-                    </a>
-                    <span className="text-[10px] text-emerald-300/80 shrink-0">({selectedDetailSession.studentHomeworkFile.size})</span>
-                  </div>
-                  
-                  <label className="mt-2 flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 cursor-pointer transition text-[11px] font-semibold w-full text-center">
-                    {uploadingHomeworkFor === selectedDetailSession.id ? "Đang tải lên..." : "Nộp lại bài khác"}
+              {(() => {
+                const submittedFiles = selectedDetailSession.studentHomeworkFiles && selectedDetailSession.studentHomeworkFiles.length > 0
+                  ? selectedDetailSession.studentHomeworkFiles
+                  : (selectedDetailSession.studentHomeworkFile ? [selectedDetailSession.studentHomeworkFile] : []);
+
+                if (submittedFiles.length > 0) {
+                  return (
+                    <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/30 text-xs">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Đã nộp {submittedFiles.length} bài tập
+                        </span>
+                        <span className="text-[10px] text-emerald-300/80">
+                          {new Date(submittedFiles[0].submittedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-1.5 mt-2">
+                        {submittedFiles.map((file: any, fIdx: number) => (
+                          <div key={fIdx} className="flex items-center gap-2 overflow-hidden bg-emerald-950/40 p-2 rounded-lg border border-emerald-500/20">
+                            <Paperclip className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <a 
+                              href={file.url} 
+                              target="_blank" 
+                              rel="noreferrer" 
+                              className="text-emerald-200 font-medium truncate hover:underline"
+                            >
+                              {file.name}
+                            </a>
+                            <span className="text-[10px] text-emerald-300/80 shrink-0">({file.size})</span>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <label className="mt-2 flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 cursor-pointer transition text-[11px] font-semibold w-full text-center">
+                        {uploadingHomeworkFor === selectedDetailSession.id ? "Đang tải lên..." : "Nộp lại bài khác (Chọn nhiều file)"}
+                        <input 
+                          type="file"
+                          multiple
+                          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
+                          className="hidden"
+                          onChange={(e) => handleStudentHomeworkUpload(selectedDetailSession.id, e)}
+                          disabled={uploadingHomeworkFor === selectedDetailSession.id}
+                        />
+                      </label>
+                    </div>
+                  );
+                }
+
+                return (
+                  <label className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 cursor-pointer transition text-xs font-semibold text-emerald-300 w-full text-center">
+                    <Upload className="w-4 h-4 text-emerald-400" />
+                    {uploadingHomeworkFor === selectedDetailSession.id ? "Đang tải bài tập lên..." : "Chọn file nộp bài (Nhiều file, <= 10MB)"}
                     <input 
                       type="file"
+                      multiple
                       accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
                       className="hidden"
                       onChange={(e) => handleStudentHomeworkUpload(selectedDetailSession.id, e)}
                       disabled={uploadingHomeworkFor === selectedDetailSession.id}
                     />
                   </label>
-                </div>
-              ) : (
-                <label className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 cursor-pointer transition text-xs font-semibold text-emerald-300 w-full text-center">
-                  <Upload className="w-4 h-4 text-emerald-400" />
-                  {uploadingHomeworkFor === selectedDetailSession.id ? "Đang tải bài tập lên..." : "Chọn file nộp bài (<= 10MB)"}
-                  <input 
-                    type="file"
-                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
-                    className="hidden"
-                    onChange={(e) => handleStudentHomeworkUpload(selectedDetailSession.id, e)}
-                    disabled={uploadingHomeworkFor === selectedDetailSession.id}
-                  />
-                </label>
-              )}
+                );
+              })()}
             </div>
 
             {/* Footer Buttons */}
@@ -745,9 +758,9 @@ export default function ParentPortalPage() {
                     <BookOpen className="w-4 h-4" />
                     Đề Cương Ôn Tập ({selectedMonth})
                   </h4>
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {monthlyOutlines.filter(o => o.month === selectedMonth).map(outline => (
-                      <div key={outline.id} className="flex flex-col gap-3 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 flex-1">
+                      <div key={outline.id} className="flex flex-col gap-3 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 min-w-0">
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2 overflow-hidden min-w-0">
                             <Paperclip className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -768,53 +781,71 @@ export default function ParentPortalPage() {
                         
                         {/* Outline Homework Submission Area */}
                         <div className="pt-2 border-t border-emerald-500/20">
-                          {outline.studentHomeworkFile ? (
-                            <div className="bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-500/20 text-xs">
-                              <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  Đã nộp bài tập
-                                </span>
-                                <span className="text-[10px] text-emerald-300/80">
-                                  {new Date(outline.studentHomeworkFile.submittedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 overflow-hidden bg-black/20 p-2 rounded-lg border border-emerald-500/20">
-                                <Paperclip className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                                <a 
-                                  href={outline.studentHomeworkFile.url} 
-                                  target="_blank" 
-                                  rel="noreferrer" 
-                                  className="text-emerald-200 font-medium truncate hover:underline"
-                                >
-                                  {outline.studentHomeworkFile.name}
-                                </a>
-                              </div>
-                              
-                              <label className="mt-2 flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 cursor-pointer transition text-[11px] font-semibold w-full text-center">
-                                {uploadingOutlineHomeworkFor === outline.id ? "Đang tải lên..." : "Nộp lại bài khác"}
+                          {(() => {
+                            const submittedFiles = outline.studentHomeworkFiles && outline.studentHomeworkFiles.length > 0
+                              ? outline.studentHomeworkFiles
+                              : (outline.studentHomeworkFile ? [outline.studentHomeworkFile] : []);
+
+                            if (submittedFiles.length > 0) {
+                              return (
+                                <div className="bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-500/20 text-xs">
+                                  <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      Đã nộp {submittedFiles.length} bài tập
+                                    </span>
+                                    <span className="text-[10px] text-emerald-300/80">
+                                      {new Date(submittedFiles[0].submittedAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="space-y-1 mt-2">
+                                    {submittedFiles.map((file: any, fIdx: number) => (
+                                      <div key={fIdx} className="flex items-center gap-2 overflow-hidden bg-black/20 p-2 rounded-lg border border-emerald-500/20">
+                                        <Paperclip className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                        <a 
+                                          href={file.url} 
+                                          target="_blank" 
+                                          rel="noreferrer" 
+                                          className="text-emerald-200 font-medium truncate hover:underline"
+                                        >
+                                          {file.name}
+                                        </a>
+                                        <span className="text-[10px] text-emerald-300/80 shrink-0">({file.size})</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  
+                                  <label className="mt-2 flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 cursor-pointer transition text-[11px] font-semibold w-full text-center">
+                                    {uploadingOutlineHomeworkFor === outline.id ? "Đang tải lên..." : "Nộp lại bài khác (Chọn nhiều file)"}
+                                    <input 
+                                      type="file"
+                                      multiple
+                                      accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
+                                      className="hidden"
+                                      onChange={(e) => handleOutlineHomeworkUpload(outline.id, e)}
+                                      disabled={uploadingOutlineHomeworkFor === outline.id}
+                                    />
+                                  </label>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <label className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-dashed border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 cursor-pointer transition text-xs font-semibold text-emerald-300 w-full text-center">
+                                <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                                {uploadingOutlineHomeworkFor === outline.id ? "Đang tải bài tập lên..." : "Nộp bài tập đề cương (Nhiều file, <= 10MB)"}
                                 <input 
                                   type="file"
+                                  multiple
                                   accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
                                   className="hidden"
                                   onChange={(e) => handleOutlineHomeworkUpload(outline.id, e)}
                                   disabled={uploadingOutlineHomeworkFor === outline.id}
                                 />
                               </label>
-                            </div>
-                          ) : (
-                            <label className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg border border-dashed border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 cursor-pointer transition text-xs font-semibold text-emerald-300 w-full text-center">
-                              <Upload className="w-3.5 h-3.5 text-emerald-400" />
-                              {uploadingOutlineHomeworkFor === outline.id ? "Đang tải bài tập lên..." : "Nộp bài tập đề cương (<= 10MB)"}
-                              <input 
-                                type="file"
-                                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
-                                className="hidden"
-                                onChange={(e) => handleOutlineHomeworkUpload(outline.id, e)}
-                                disabled={uploadingOutlineHomeworkFor === outline.id}
-                              />
-                            </label>
-                          )}
+                            );
+                          })()}
                         </div>
                       </div>
                     ))}

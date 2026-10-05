@@ -38,6 +38,7 @@ export interface ClassSessionItem {
   icon?: any;
   rescheduleRequest?: RescheduleRequest | null;
   studentHomeworkFile?: StudentHomeworkFile | null;
+  studentHomeworkFiles?: StudentHomeworkFile[] | null;
 }
 
 interface CheckInModalProps {
