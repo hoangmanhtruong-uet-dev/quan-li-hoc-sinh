@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, CheckCircle2, Award, FileText, Calendar, Upload, FileCheck, Paperclip, Trash2, Trophy } from "lucide-react";
-import { uploadHomeworkFileToStorage } from "@/lib/storage";
+import { uploadHomeworkFilesToStorage } from "@/lib/storage";
 
 export interface RescheduleRequest {
   id: string;
@@ -25,6 +25,7 @@ export interface ClassSessionItem {
   status: "COMPLETED" | "SCHEDULED" | "CANCELLED" | "RESCHEDULED";
   homework?: string;
   homeworkFile?: { name: string; size: string; url: string } | null;
+  homeworkFiles?: { name: string; size: string; url: string }[] | null;
   tutorFeedback?: string;
   testScore?: number; // Thang điểm 10
   icon?: any;
@@ -44,7 +45,7 @@ export function CheckInModal({ isOpen, session, onClose, onSaveSession }: CheckI
   const [tutorFeedback, setTutorFeedback] = useState("");
   const [testScore, setTestScore] = useState<string>("");
   const [status, setStatus] = useState<"COMPLETED" | "SCHEDULED" | "CANCELLED" | "RESCHEDULED">("COMPLETED");
-  const [uploadedFile, setUploadedFile] = useState<{ name: string; size: string; url: string } | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: string; url: string }[]>([]);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -54,26 +55,31 @@ export function CheckInModal({ isOpen, session, onClose, onSaveSession }: CheckI
       setTutorFeedback(session.tutorFeedback || "");
       setTestScore(session.testScore !== undefined ? String(session.testScore) : "");
       setStatus(session.status === "SCHEDULED" ? "COMPLETED" : session.status);
-      setUploadedFile(session.homeworkFile || null);
+      
+      const initialFiles = session.homeworkFiles && session.homeworkFiles.length > 0 
+        ? session.homeworkFiles 
+        : (session.homeworkFile ? [session.homeworkFile] : []);
+      setUploadedFiles(initialFiles);
     }
   }, [session]);
 
   if (!isOpen || !session) return null;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = e.target.files;
+    if (files && files.length > 0) {
       setUploading(true);
-      const result = await uploadHomeworkFileToStorage(file);
-      if (result) {
-        setUploadedFile(result);
+      const results = await uploadHomeworkFilesToStorage(files);
+      if (results.length > 0) {
+        setUploadedFiles(prev => [...prev, ...results]);
       }
       setUploading(false);
+      e.target.value = "";
     }
   };
 
-  const handleRemoveFile = () => {
-    setUploadedFile(null);
+  const handleRemoveFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -82,7 +88,8 @@ export function CheckInModal({ isOpen, session, onClose, onSaveSession }: CheckI
       ...session,
       topic,
       homework,
-      homeworkFile: uploadedFile,
+      homeworkFiles: uploadedFiles.length > 0 ? uploadedFiles : null,
+      homeworkFile: uploadedFiles[0] || null,
       tutorFeedback,
       testScore: testScore !== "" ? Number(testScore) : undefined,
       status,
@@ -179,9 +186,14 @@ export function CheckInModal({ isOpen, session, onClose, onSaveSession }: CheckI
           </div>
 
           <div className="space-y-2">
-            <label className="block text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-purple-400" />
-              Bài tập về nhà & Đề bài đính kèm
+            <label className="block text-xs font-semibold text-slate-300 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-purple-400" />
+                Bài tập về nhà & File đính kèm
+              </span>
+              <span className="text-[10px] text-purple-300/80 font-normal">
+                (Tối đa 10MB / file)
+              </span>
             </label>
             
             <input
@@ -192,35 +204,47 @@ export function CheckInModal({ isOpen, session, onClose, onSaveSession }: CheckI
               className="w-full px-3.5 py-2 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-xs"
             />
 
-            {!uploadedFile ? (
-              <label className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 cursor-pointer transition text-xs font-semibold text-purple-300">
-                <Upload className="w-4 h-4 text-purple-400" />
-                {uploading ? "Đang tải file lên Cloud Storage..." : "Tải file bài tập lên (PDF, Word, Ảnh)"}
-                <input 
-                  type="file" 
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" 
-                  className="hidden" 
-                  onChange={handleFileUpload}
-                  disabled={uploading}
-                />
-              </label>
-            ) : (
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-xs">
-                <div className="flex items-center gap-2 overflow-hidden">
-                  <Paperclip className="w-4 h-4 text-purple-400 shrink-0" />
-                  <span className="text-white font-medium truncate">{uploadedFile.name}</span>
-                  <span className="text-[10px] text-purple-300/80 shrink-0">({uploadedFile.size})</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleRemoveFile}
-                  className="p-1 rounded-md text-red-400 hover:bg-red-500/20 transition"
-                  title="Xóa file"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+            {uploadedFiles.length > 0 && (
+              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                {uploadedFiles.map((file, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-xs">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <Paperclip className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                      <a 
+                        href={file.url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="text-purple-200 font-medium truncate hover:underline"
+                      >
+                        {file.name}
+                      </a>
+                      <span className="text-[10px] text-purple-300/80 shrink-0">({file.size})</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFile(idx)}
+                      className="p-1 rounded-md text-red-400 hover:bg-red-500/20 transition"
+                      title="Xóa file"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
+
+            <label className="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-dashed border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 cursor-pointer transition text-xs font-semibold text-purple-300">
+              <Upload className="w-4 h-4 text-purple-400" />
+              {uploading ? "Đang tải các file lên..." : "Tải đính kèm file bài tập (chọn 1 hoặc nhiều file, <= 10MB)"}
+              <input 
+                type="file" 
+                multiple
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip" 
+                className="hidden" 
+                onChange={handleFileUpload}
+                disabled={uploading}
+              />
+            </label>
           </div>
 
           <div className="pt-2 flex gap-3">

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, UserPlus, BookOpen, Phone, DollarSign, GraduationCap, Calendar, Clock, ArrowRight, Sparkles, Check, ArrowLeft, Trash2, Plus, Upload, Paperclip } from "lucide-react";
 import { Student, Subject } from "@/types/database";
-import { uploadHomeworkFileToStorage } from "@/lib/storage";
+import { uploadHomeworkFilesToStorage } from "@/lib/storage";
 
 export interface RoadmapSessionConfig {
   date: string;
@@ -11,6 +11,7 @@ export interface RoadmapSessionConfig {
   time: string;
   topic: string;
   homeworkFile?: { name: string; size: string; url: string } | null;
+  homeworkFiles?: { name: string; size: string; url: string }[] | null;
 }
 
 export interface NewStudentPayload extends Omit<Student, "id" | "createdAt"> {
@@ -87,22 +88,45 @@ export function AddStudentModal({ isOpen, onClose, onAddStudent }: AddStudentMod
   };
 
   const handleFileUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = e.target.files;
+    if (files && files.length > 0) {
       setUploadingIndex(index);
-      const result = await uploadHomeworkFileToStorage(file);
-      if (result) {
+      const results = await uploadHomeworkFilesToStorage(files);
+      if (results.length > 0) {
         setRoadmapSessions((prev) =>
-          prev.map((item, idx) => (idx === index ? { ...item, homeworkFile: result } : item))
+          prev.map((item, idx) => {
+            if (idx !== index) return item;
+            const existingFiles = item.homeworkFiles && item.homeworkFiles.length > 0
+              ? item.homeworkFiles
+              : (item.homeworkFile ? [item.homeworkFile] : []);
+            const updatedFiles = [...existingFiles, ...results];
+            return {
+              ...item,
+              homeworkFiles: updatedFiles,
+              homeworkFile: updatedFiles[0] || null,
+            };
+          })
         );
       }
       setUploadingIndex(null);
+      e.target.value = "";
     }
   };
 
-  const handleRemoveFile = (index: number) => {
+  const handleRemoveFile = (index: number, fileIdx: number) => {
     setRoadmapSessions((prev) =>
-      prev.map((item, idx) => (idx === index ? { ...item, homeworkFile: null } : item))
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        const existingFiles = item.homeworkFiles && item.homeworkFiles.length > 0
+          ? item.homeworkFiles
+          : (item.homeworkFile ? [item.homeworkFile] : []);
+        const updatedFiles = existingFiles.filter((_, i) => i !== fileIdx);
+        return {
+          ...item,
+          homeworkFiles: updatedFiles.length > 0 ? updatedFiles : null,
+          homeworkFile: updatedFiles[0] || null,
+        };
+      })
     );
   };
 
@@ -401,33 +425,48 @@ export function AddStudentModal({ isOpen, onClose, onAddStudent }: AddStudentMod
                       className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-xs text-white focus:outline-none focus:border-indigo-500 font-medium"
                     />
 
-                    {!session.homeworkFile ? (
-                      <label className="inline-flex items-center gap-1.5 text-[11px] text-purple-300 hover:text-purple-200 cursor-pointer w-fit bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 px-2.5 py-1 rounded-md transition">
-                        <Upload className="w-3 h-3 text-purple-400" />
-                        {uploadingIndex === index ? "Đang tải file lên..." : "Đính kèm file bài tập / tài liệu"}
-                        <input
-                          type="file"
-                          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                          className="hidden"
-                          disabled={uploadingIndex === index}
-                          onChange={(e) => handleFileUpload(index, e)}
-                        />
-                      </label>
-                    ) : (
-                      <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 px-2.5 py-1 rounded-md text-[11px] text-purple-200 w-fit">
-                        <Paperclip className="w-3 h-3 text-purple-400 shrink-0" />
-                        <span className="truncate max-w-[180px] font-medium">{session.homeworkFile.name}</span>
-                        <span className="text-[9px] text-purple-300/70">({session.homeworkFile.size})</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveFile(index)}
-                          className="text-red-400 hover:text-red-300 ml-1"
-                          title="Xóa file"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
+                    {(() => {
+                      const files = session.homeworkFiles && session.homeworkFiles.length > 0
+                        ? session.homeworkFiles
+                        : (session.homeworkFile ? [session.homeworkFile] : []);
+
+                      return (
+                        <div className="space-y-1">
+                          {files.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                              {files.map((file, fileIdx) => (
+                                <div key={fileIdx} className="inline-flex items-center gap-1.5 bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded-md text-[11px] text-purple-200">
+                                  <Paperclip className="w-3 h-3 text-purple-400 shrink-0" />
+                                  <span className="truncate max-w-[150px] font-medium">{file.name}</span>
+                                  <span className="text-[9px] text-purple-300/70">({file.size})</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveFile(index, fileIdx)}
+                                    className="text-red-400 hover:text-red-300 ml-0.5"
+                                    title="Xóa file này"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <label className="inline-flex items-center gap-1.5 text-[11px] text-purple-300 hover:text-purple-200 cursor-pointer w-fit bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 px-2.5 py-1 rounded-md transition">
+                            <Upload className="w-3 h-3 text-purple-400" />
+                            {uploadingIndex === index ? "Đang tải file..." : "Đính kèm file (nhiều file, <=10MB)"}
+                            <input
+                              type="file"
+                              multiple
+                              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
+                              className="hidden"
+                              disabled={uploadingIndex === index}
+                              onChange={(e) => handleFileUpload(index, e)}
+                            />
+                          </label>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <button

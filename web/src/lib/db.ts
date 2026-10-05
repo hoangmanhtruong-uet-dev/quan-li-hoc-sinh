@@ -61,6 +61,62 @@ export async function fetchStudentsByPhoneFromDB(phone: string): Promise<Student
   }
 }
 
+// ===============================================
+// HELPER FUNCTIONS FOR MULTIPLE FILES
+// ===============================================
+
+export function parseHomeworkFilesFromDB(cs: any): { name: string; url: string; size: string }[] {
+  if (!cs.homework_file_url && !cs.homework_file_name) return [];
+
+  if (cs.homework_file_url && cs.homework_file_url.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(cs.homework_file_url);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    } catch {
+      // Fallback if JSON parse fails
+    }
+  }
+
+  return [{
+    name: cs.homework_file_name || "File đính kèm",
+    url: cs.homework_file_url || "#",
+    size: cs.homework_file_size || "1 MB",
+  }];
+}
+
+export function formatHomeworkFilesForDB(session: {
+  homeworkFiles?: { name: string; url: string; size: string }[] | null;
+  homeworkFile?: { name: string; url: string; size: string } | null;
+}) {
+  const files = session.homeworkFiles && session.homeworkFiles.length > 0
+    ? session.homeworkFiles
+    : (session.homeworkFile ? [session.homeworkFile] : []);
+
+  if (files.length === 0) {
+    return {
+      homework_file_name: null,
+      homework_file_url: null,
+      homework_file_size: null,
+    };
+  }
+
+  if (files.length === 1) {
+    return {
+      homework_file_name: files[0].name,
+      homework_file_url: files[0].url,
+      homework_file_size: files[0].size,
+    };
+  }
+
+  return {
+    homework_file_name: `${files.length} file đính kèm`,
+    homework_file_url: JSON.stringify(files),
+    homework_file_size: files.map((f) => f.size).join(", "),
+  };
+}
+
 export async function insertStudentWithRoadmapToDB(payload: NewStudentPayload): Promise<{ student: Student; sessions: ClassSessionItem[] } | null> {
   try {
     // Try to get tutor_id if logged in, but don't require it (single-tutor mode)
@@ -119,9 +175,7 @@ export async function insertStudentWithRoadmapToDB(payload: NewStudentPayload): 
       month: getCurrentMonthStr(),
       time: s.time,
       status: "SCHEDULED",
-      homework_file_name: s.homeworkFile?.name || null,
-      homework_file_url: s.homeworkFile?.url || null,
-      homework_file_size: s.homeworkFile?.size || null,
+      ...formatHomeworkFilesForDB(s),
     }));
 
     const { data: sessionsData, error: sessionsErr } = await supabase
@@ -133,17 +187,22 @@ export async function insertStudentWithRoadmapToDB(payload: NewStudentPayload): 
       console.error("Error inserting sessions to Supabase:", sessionsErr);
     }
 
-    const createdSessions: ClassSessionItem[] = (sessionsData || []).map((cs) => ({
-      id: cs.id,
-      student: cs.student_name,
-      subject: cs.subject,
-      topic: cs.topic,
-      roadmapTopic: cs.roadmap_topic || cs.topic,
-      time: cs.time,
-      date: cs.date,
-      month: cs.month,
-      status: cs.status,
-    }));
+    const createdSessions: ClassSessionItem[] = (sessionsData || []).map((cs) => {
+      const files = parseHomeworkFilesFromDB(cs);
+      return {
+        id: cs.id,
+        student: cs.student_name,
+        subject: cs.subject,
+        topic: cs.topic,
+        roadmapTopic: cs.roadmap_topic || cs.topic,
+        time: cs.time,
+        date: cs.date,
+        month: cs.month,
+        status: cs.status,
+        homeworkFiles: files.length > 0 ? files : null,
+        homeworkFile: files.length > 0 ? files[0] : null,
+      };
+    });
 
     return { student: createdStudent, sessions: createdSessions };
   } catch (err) {
@@ -185,26 +244,24 @@ export async function fetchSessionsFromDB(): Promise<ClassSessionItem[]> {
       return [];
     }
 
-    return data.map((cs) => ({
-      id: cs.id,
-      student: cs.student_name,
-      subject: cs.subject,
-      topic: cs.topic,
-      roadmapTopic: cs.roadmap_topic || cs.topic,
-      time: cs.time,
-      date: cs.date,
-      month: cs.month,
-      status: cs.status,
-      homework: cs.homework,
-      homeworkFile: cs.homework_file_name
-        ? {
-            name: cs.homework_file_name,
-            url: cs.homework_file_url || "#",
-            size: cs.homework_file_size || "1 MB",
-          }
-        : null,
-      tutorFeedback: cs.tutor_feedback,
-    }));
+    return data.map((cs) => {
+      const files = parseHomeworkFilesFromDB(cs);
+      return {
+        id: cs.id,
+        student: cs.student_name,
+        subject: cs.subject,
+        topic: cs.topic,
+        roadmapTopic: cs.roadmap_topic || cs.topic,
+        time: cs.time,
+        date: cs.date,
+        month: cs.month,
+        status: cs.status,
+        homework: cs.homework,
+        homeworkFiles: files.length > 0 ? files : null,
+        homeworkFile: files.length > 0 ? files[0] : null,
+        tutorFeedback: cs.tutor_feedback,
+      };
+    });
   } catch (err) {
     console.error("Failed to fetch sessions:", err);
     return [];
@@ -219,9 +276,7 @@ export async function updateSessionCheckInInDB(session: ClassSessionItem): Promi
         topic: session.topic,
         status: session.status,
         homework: session.homework,
-        homework_file_name: session.homeworkFile?.name || null,
-        homework_file_url: session.homeworkFile?.url || null,
-        homework_file_size: session.homeworkFile?.size || null,
+        ...formatHomeworkFilesForDB(session),
         tutor_feedback: session.tutorFeedback,
         test_score: session.testScore,
       })
@@ -254,9 +309,6 @@ export async function updateRoadmapSessionsInDB(updatedSessions: ClassSessionIte
     }
 
     // 2. Update existing and Insert new
-    // Supabase .upsert() can be used if we format the data properly.
-    // However, new sessions have 'new-xxx' IDs. We should remove the ID so DB generates a UUID.
-    
     const upsertData = updatedSessions.map(s => {
       const data: any = {
         student_name: s.student,
@@ -266,20 +318,12 @@ export async function updateRoadmapSessionsInDB(updatedSessions: ClassSessionIte
         date: s.date,
         time: s.time,
         status: s.status,
-        homework_file_name: s.homeworkFile?.name || null,
-        homework_file_url: s.homeworkFile?.url || null,
-        homework_file_size: s.homeworkFile?.size || null,
+        ...formatHomeworkFilesForDB(s),
       };
       
       // If it's an existing session, we pass the UUID
       if (!s.id.startsWith("new-")) {
         data.id = s.id;
-      } else {
-        // For new sessions we must pass student_id and month. 
-        // We can get student_id from a known field if we fetch it, or just do an insert if we had the student_id.
-        // Wait, updatedSessions doesn't have student_id. We need to fetch the student_id by name, 
-        // or we should have passed it from the modal!
-        // It's safer to fetch the student_id here if it's a new session.
       }
       return data;
     });

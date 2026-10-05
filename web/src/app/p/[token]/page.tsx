@@ -465,38 +465,55 @@ export default function ParentPortalPage() {
                           </div>
                         )}
 
-                        {(session.homework || session.homeworkFile) && (
-                          <div className="bg-white/5 p-3.5 rounded-xl border border-white/5 space-y-2">
-                            {session.homework && (
-                              <div>
-                                <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5 mb-1">
-                                  <FileText className="w-4 h-4 text-purple-400" />
-                                  Bài tập về nhà:
-                                </span>
-                                <p className="text-slate-300 text-xs">{session.homework}</p>
-                              </div>
-                            )}
+                        {(() => {
+                          const files = session.homeworkFiles && session.homeworkFiles.length > 0
+                            ? session.homeworkFiles
+                            : (session.homeworkFile ? [session.homeworkFile] : []);
 
-                            {/* File Download Button for Parent */}
-                            {session.homeworkFile && (
-                              <div className="pt-2 border-t border-white/5 flex items-center justify-between bg-purple-500/10 p-2.5 rounded-lg border border-purple-500/20">
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                  <Paperclip className="w-4 h-4 text-purple-400 shrink-0" />
-                                  <span className="text-xs text-white font-medium truncate">{session.homeworkFile.name}</span>
-                                  <span className="text-[10px] text-purple-300/80 shrink-0">({session.homeworkFile.size})</span>
+                          if (!session.homework && files.length === 0) return null;
+
+                          return (
+                            <div className="bg-white/5 p-3.5 rounded-xl border border-white/5 space-y-2">
+                              {session.homework && (
+                                <div>
+                                  <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5 mb-1">
+                                    <FileText className="w-4 h-4 text-purple-400" />
+                                    Bài tập về nhà:
+                                  </span>
+                                  <p className="text-slate-300 text-xs">{session.homework}</p>
                                 </div>
-                                <a
-                                  href={session.homeworkFile.url}
-                                  download
-                                  className="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-semibold flex items-center gap-1 transition shrink-0"
-                                >
-                                  <Download className="w-3 h-3" />
-                                  Tải Đề Bài
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                              )}
+
+                              {/* File Download List for Parent */}
+                              {files.length > 0 && (
+                                <div className="pt-2 border-t border-white/5 space-y-1.5">
+                                  <span className="text-[11px] font-semibold text-purple-300 block mb-1">
+                                    File đính kèm ({files.length}):
+                                  </span>
+                                  {files.map((file, fileIdx) => (
+                                    <div key={fileIdx} className="flex items-center justify-between bg-purple-500/10 p-2.5 rounded-lg border border-purple-500/20">
+                                      <div className="flex items-center gap-2 overflow-hidden">
+                                        <Paperclip className="w-4 h-4 text-purple-400 shrink-0" />
+                                        <span className="text-xs text-white font-medium truncate">{file.name}</span>
+                                        <span className="text-[10px] text-purple-300/80 shrink-0">({file.size})</span>
+                                      </div>
+                                      <a
+                                        href={file.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        download
+                                        className="px-2.5 py-1 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-semibold flex items-center gap-1 transition shrink-0"
+                                      >
+                                        <Download className="w-3 h-3" />
+                                        Tải Đề Bài
+                                      </a>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

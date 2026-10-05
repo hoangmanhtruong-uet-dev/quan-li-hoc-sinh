@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Save, Trash2, Plus, Calendar, Clock, BookOpen, Upload, Paperclip } from "lucide-react";
 import { ClassSessionItem } from "./CheckInModal";
 import { Student } from "@/types/database";
-import { uploadHomeworkFileToStorage } from "@/lib/storage";
+import { uploadHomeworkFilesToStorage } from "@/lib/storage";
 
 interface EditRoadmapModalProps {
   isOpen: boolean;
@@ -36,22 +36,45 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
   };
 
   const handleFileUpload = async (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = e.target.files;
+    if (files && files.length > 0) {
       setUploadingId(id);
-      const result = await uploadHomeworkFileToStorage(file);
-      if (result) {
+      const results = await uploadHomeworkFilesToStorage(files);
+      if (results.length > 0) {
         setEditingSessions(prev =>
-          prev.map(s => s.id === id ? { ...s, homeworkFile: result } : s)
+          prev.map(s => {
+            if (s.id !== id) return s;
+            const existingFiles = s.homeworkFiles && s.homeworkFiles.length > 0
+              ? s.homeworkFiles
+              : (s.homeworkFile ? [s.homeworkFile] : []);
+            const updatedFiles = [...existingFiles, ...results];
+            return {
+              ...s,
+              homeworkFiles: updatedFiles,
+              homeworkFile: updatedFiles[0] || null,
+            };
+          })
         );
       }
       setUploadingId(null);
+      e.target.value = "";
     }
   };
 
-  const handleRemoveFile = (id: string) => {
+  const handleRemoveFile = (id: string, fileIdx: number) => {
     setEditingSessions(prev =>
-      prev.map(s => s.id === id ? { ...s, homeworkFile: null } : s)
+      prev.map(s => {
+        if (s.id !== id) return s;
+        const existingFiles = s.homeworkFiles && s.homeworkFiles.length > 0
+          ? s.homeworkFiles
+          : (s.homeworkFile ? [s.homeworkFile] : []);
+        const updatedFiles = existingFiles.filter((_, idx) => idx !== fileIdx);
+        return {
+          ...s,
+          homeworkFiles: updatedFiles.length > 0 ? updatedFiles : null,
+          homeworkFile: updatedFiles[0] || null,
+        };
+      })
     );
   };
 
@@ -115,52 +138,65 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
               Học sinh này không có buổi học nào sắp tới.
             </div>
           ) : (
-            editingSessions.map((session, index) => (
-              <div key={session.id} className="flex flex-col md:flex-row gap-4 bg-white/5 p-4 rounded-xl border border-white/10 items-start">
-                <div className="flex-1 space-y-2">
-                  <label className="text-xs text-slate-400 font-semibold">Tên bài học</label>
-                  <input
-                    type="text"
-                    value={session.topic}
-                    onChange={(e) => handleUpdateSession(session.id, 'topic', e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
-                    placeholder="VD: Cấu tạo nguyên tử"
-                  />
-                  {!session.homeworkFile ? (
-                    <label className="inline-flex items-center gap-1.5 text-xs text-purple-300 hover:text-purple-200 cursor-pointer w-fit bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 px-2.5 py-1 rounded-md transition mt-1">
-                      <Upload className="w-3.5 h-3.5 text-purple-400" />
-                      {uploadingId === session.id ? "Đang tải file lên..." : "Đính kèm file bài tập / tài liệu"}
-                      <input
-                        type="file"
-                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                        className="hidden"
-                        disabled={uploadingId === session.id}
-                        onChange={(e) => handleFileUpload(session.id, e)}
-                      />
-                    </label>
-                  ) : (
-                    <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 px-2.5 py-1 rounded-md text-xs text-purple-200 w-fit mt-1">
-                      <Paperclip className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                      <a 
-                        href={session.homeworkFile.url} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="truncate max-w-[200px] font-medium hover:underline text-purple-300"
-                      >
-                        {session.homeworkFile.name}
-                      </a>
-                      <span className="text-[10px] text-purple-300/70">({session.homeworkFile.size})</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFile(session.id)}
-                        className="text-red-400 hover:text-red-300 ml-1"
-                        title="Xóa file"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+            editingSessions.map((session, index) => {
+              const files = session.homeworkFiles && session.homeworkFiles.length > 0
+                ? session.homeworkFiles
+                : (session.homeworkFile ? [session.homeworkFile] : []);
+
+              return (
+                <div key={session.id} className="flex flex-col md:flex-row gap-4 bg-white/5 p-4 rounded-xl border border-white/10 items-start">
+                  <div className="flex-1 space-y-2">
+                    <label className="text-xs text-slate-400 font-semibold">Tên bài học</label>
+                    <input
+                      type="text"
+                      value={session.topic}
+                      onChange={(e) => handleUpdateSession(session.id, 'topic', e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
+                      placeholder="VD: Cấu tạo nguyên tử"
+                    />
+
+                    <div className="space-y-1 pt-1">
+                      {files.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                          {files.map((file, fileIdx) => (
+                            <div key={fileIdx} className="inline-flex items-center gap-1.5 bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded-md text-xs text-purple-200">
+                              <Paperclip className="w-3 h-3 text-purple-400 shrink-0" />
+                              <a 
+                                href={file.url} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="truncate max-w-[150px] font-medium hover:underline text-purple-300"
+                              >
+                                {file.name}
+                              </a>
+                              <span className="text-[10px] text-purple-300/70">({file.size})</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFile(session.id, fileIdx)}
+                                className="text-red-400 hover:text-red-300 ml-0.5"
+                                title="Xóa file này"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <label className="inline-flex items-center gap-1.5 text-xs text-purple-300 hover:text-purple-200 cursor-pointer w-fit bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 px-2.5 py-1 rounded-md transition mt-1">
+                        <Upload className="w-3.5 h-3.5 text-purple-400" />
+                        {uploadingId === session.id ? "Đang tải file..." : "Đính kèm file (nhiều file, <=10MB)"}
+                        <input
+                          type="file"
+                          multiple
+                          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt,.zip"
+                          className="hidden"
+                          disabled={uploadingId === session.id}
+                          onChange={(e) => handleFileUpload(session.id, e)}
+                        />
+                      </label>
                     </div>
-                  )}
-                </div>
+                  </div>
                 
                 <div className="w-full md:w-40 space-y-2">
                   <label className="text-xs text-slate-400 font-semibold">Ngày học</label>
@@ -200,7 +236,8 @@ export function EditRoadmapModal({ isOpen, student, sessions, onClose, onSave }:
                   </button>
                 </div>
               </div>
-            ))
+            );
+          })
           )}
 
           <button

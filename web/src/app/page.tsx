@@ -673,12 +673,18 @@ export default function Dashboard() {
                                   </span>
                                 )}
 
-                                {session.homeworkFile && (
-                                  <span className="text-[11px] text-purple-300 flex items-center gap-1 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/30 font-medium">
-                                    <Paperclip className="w-3 h-3 text-purple-400" />
-                                    {session.homeworkFile.name}
-                                  </span>
-                                )}
+                                {(() => {
+                                  const files = session.homeworkFiles && session.homeworkFiles.length > 0
+                                    ? session.homeworkFiles
+                                    : (session.homeworkFile ? [session.homeworkFile] : []);
+                                  if (files.length === 0) return null;
+                                  return files.map((f, fIdx) => (
+                                    <span key={fIdx} className="text-[11px] text-purple-300 flex items-center gap-1 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/30 font-medium">
+                                      <Paperclip className="w-3 h-3 text-purple-400" />
+                                      {f.name}
+                                    </span>
+                                  ));
+                                })()}
                               </div>
                             </div>
                           </div>
@@ -855,12 +861,18 @@ export default function Dashboard() {
                             </span>
                           )}
 
-                          {session.homeworkFile && (
-                            <span className="text-xs text-purple-300 flex items-center gap-1.5 bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/30 font-medium">
-                              <Paperclip className="w-3.5 h-3.5 text-purple-400" />
-                              {session.homeworkFile.name} ({session.homeworkFile.size})
-                            </span>
-                          )}
+                          {(() => {
+                            const files = session.homeworkFiles && session.homeworkFiles.length > 0
+                              ? session.homeworkFiles
+                              : (session.homeworkFile ? [session.homeworkFile] : []);
+                            if (files.length === 0) return null;
+                            return files.map((f, fIdx) => (
+                              <span key={fIdx} className="text-xs text-purple-300 flex items-center gap-1.5 bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/30 font-medium">
+                                <Paperclip className="w-3.5 h-3.5 text-purple-400" />
+                                {f.name} ({f.size})
+                              </span>
+                            ));
+                          })()}
                         </div>
                       </div>
                     </div>
