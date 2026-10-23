@@ -28,6 +28,7 @@ import { cn, getCurrentMonthStr, getUpcomingMonthOptions } from "@/lib/utils";
 import { fetchStudentsFromDB, fetchSessionsFromDB, submitRescheduleRequest, submitParentFeedback, submitStudentHomeworkToDB, fetchMonthlyOutlinesFromDB, MonthlyOutlineItem, submitMonthlyOutlineHomeworkToDB } from "@/lib/db";
 import { Student } from "@/types/database";
 import { ClassSessionItem, StudentHomeworkFile } from "@/components/CheckInModal";
+import { TopicReviewSection } from "@/components/TopicReviewSection";
 import { StudentProgressChart } from "@/components/StudentProgressChart";
 import { PrintableReportModal } from "@/components/PrintableReportModal";
 import { RescheduleModal } from "@/components/RescheduleModal";
@@ -992,6 +993,26 @@ export default function ParentPortalPage() {
                 }))}
               </div>
             </div>
+
+            {/* Topic Review Section */}
+            {student && (
+              <div className="mt-8">
+                <div className="mb-4">
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-indigo-400" />
+                    Chủ Đề Ôn Tập & Tài Liệu
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Theo dõi các chuyên đề kiến thức gia sư đang củng cố cho học sinh kèm tài liệu ôn luyện.
+                  </p>
+                </div>
+                <TopicReviewSection 
+                  students={[student]} 
+                  readOnly={true}
+                  studentId={student.id}
+                />
+              </div>
+            )}
           </>
         )}
 

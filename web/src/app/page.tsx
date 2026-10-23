@@ -41,6 +41,7 @@ import {
 import { cn, getCurrentMonthStr } from "@/lib/utils";
 import { AddStudentModal, NewStudentPayload } from "@/components/AddStudentModal";
 import { CheckInModal, ClassSessionItem } from "@/components/CheckInModal";
+import { TopicReviewSection } from "@/components/TopicReviewSection";
 import { ZaloReceiptModal } from "@/components/ZaloReceiptModal";
 import { EditRoadmapModal } from "@/components/EditRoadmapModal";
 import { AddFutureMonthRoadmapModal } from "@/components/AddFutureMonthRoadmapModal";
@@ -81,7 +82,7 @@ const getSubjectIcon = (subject: string) => {
   return BookOpen;
 };
 
-type ActiveTab = "overview" | "schedule" | "students" | "tuition";
+type ActiveTab = "overview" | "schedule" | "students" | "tuition" | "review";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -613,6 +614,7 @@ export default function Dashboard() {
             { id: "schedule", label: "Lịch Dạy & Check-in", icon: Calendar },
             { id: "students", label: "Học Sinh & Lớp", icon: Users },
             { id: "tuition", label: "Học Phí & Thu Nhập", icon: DollarSign },
+            { id: "review", label: "Ôn Tập Chủ Đề", icon: BookOpen },
           ].map((item) => (
             <button 
               key={item.id}
@@ -682,12 +684,14 @@ export default function Dashboard() {
               {activeTab === "schedule" && "Lịch Dạy & Điểm Danh Chi Tiết"}
               {activeTab === "students" && "Danh Sách Học Sinh & Lộ Trình"}
               {activeTab === "tuition" && "Báo Cáo Học Phí & Thu Nhập"}
+              {activeTab === "review" && "Ôn Tập Theo Chủ Đề"}
             </h1>
             <p className="text-xs md:text-sm text-slate-400">
               {activeTab === "overview" && "Tổng quan tiến độ dạy học, học sinh và báo cáo thu nhập tháng."}
               {activeTab === "schedule" && "Xem toàn bộ lịch dạy, kiểm tra nội dung bài học và tải bài tập về nhà."}
               {activeTab === "students" && "Quản lý thông tin học sinh, sao chép Magic Link gửi cho Phụ huynh."}
               {activeTab === "tuition" && "Thống kê học phí từng học sinh, đánh dấu đã đóng và tạo tin nhắn Zalo."}
+              {activeTab === "review" && "Xem tiến độ ôn tập theo chủ đề của từng học sinh, đánh giá mức độ nắm vững kiến thức."}
             </p>
           </div>
 
@@ -1233,7 +1237,35 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* TAB 4: HỌC PHÍ & THU NHẬP (TUITION BILLING & ZALO RECEIPT) */}
+        {/* TAB 4: ÔN TẬP THEO CHỦ ĐỀ (TOPIC REVIEW) */}
+        {activeTab === "review" && (
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-indigo-400" />
+                Chuyên Đề Ôn Tập & Tài Liệu
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Quản lý các chủ đề ôn tập theo từng học sinh, cập nhật tiến độ và tải lên tài liệu ôn luyện đính kèm.
+              </p>
+            </div>
+
+            {students.length === 0 ? (
+              <div className="glass p-12 text-center rounded-2xl border border-white/5 space-y-3">
+                <BookOpen className="w-12 h-12 text-slate-600 mx-auto" />
+                <h4 className="text-base font-bold text-white">Chưa có học sinh nào</h4>
+                <p className="text-xs text-slate-400">Vui lòng thêm học sinh trước khi tạo chủ đề ôn tập.</p>
+              </div>
+            ) : (
+              <TopicReviewSection
+                students={students}
+                readOnly={false}
+              />
+            )}
+          </div>
+        )}
+
+        {/* TAB 5: HỌC PHÍ & THU NHẬP (TUITION BILLING & ZALO RECEIPT) */}
         {activeTab === "tuition" && (
           <div className="space-y-6">
             <div className="bg-slate-900/50 p-4 rounded-2xl border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">

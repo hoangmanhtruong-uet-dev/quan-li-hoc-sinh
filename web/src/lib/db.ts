@@ -827,3 +827,217 @@ export async function submitStudentHomeworkToDB(sessionId: string, files: Studen
     return false;
   }
 }
+
+// ===============================================
+// REVIEW TOPICS CRUD API
+// ===============================================
+
+export interface ReviewTopic {
+  id: string;
+  student_id: string;
+  title: string;
+  description: string | null;
+  status: "pending" | "in_progress" | "completed" | "active" | "archived" | string;
+  created_at: string;
+  updated_at: string;
+  files?: ReviewTopicFile[];
+}
+
+export interface ReviewTopicFile {
+  id: string;
+  topic_id: string;
+  file_name: string;
+  file_url: string;
+  file_size: string | null;
+  created_at: string;
+}
+
+const LOCAL_STORAGE_KEY_TOPICS = "tutortrack_review_topics_backup";
+
+function getLocalReviewTopics(): ReviewTopic[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY_TOPICS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalReviewTopics(topics: ReviewTopic[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY_TOPICS, JSON.stringify(topics));
+  } catch (e) {
+    console.warn("Could not save review topics to localStorage:", e);
+  }
+}
+
+export async function fetchReviewTopics(studentIds: string[]): Promise<ReviewTopic[]> {
+  if (!studentIds.length) return [];
+  try {
+    const { data, error } = await supabase
+      .from("review_topics")
+      .select("*, files:review_topic_files(*)")
+      .in("student_id", studentIds)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      // PGRST205 means table doesn't exist yet in Supabase schema
+      if (error.code === "PGRST205") {
+        console.warn("Table review_topics not found in Supabase. Falling back to local storage.");
+      } else {
+        console.warn("Error fetching review topics from Supabase:", error.message);
+      }
+      const local = getLocalReviewTopics();
+      return local.filter((t) => studentIds.includes(t.student_id));
+    }
+    return (data || []) as ReviewTopic[];
+  } catch (err) {
+    console.warn("Supabase fetchReviewTopics error, using local fallback:", err);
+    const local = getLocalReviewTopics();
+    return local.filter((t) => studentIds.includes(t.student_id));
+  }
+}
+
+export async function createReviewTopic(topic: { student_id: string; title: string; description?: string }): Promise<ReviewTopic | null> {
+  const localId = "topic_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+  const now = new Date().toISOString();
+  const fallbackTopic: ReviewTopic = {
+    id: localId,
+    student_id: topic.student_id,
+    title: topic.title,
+    description: topic.description || null,
+    status: "pending",
+    created_at: now,
+    updated_at: now,
+    files: [],
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from("review_topics")
+      .insert({ student_id: topic.student_id, title: topic.title, description: topic.description || null })
+      .select()
+      .single();
+
+    if (error) {
+      console.warn("Creating review topic locally (Supabase table not found or errored):", error.message);
+      const all = getLocalReviewTopics();
+      saveLocalReviewTopics([fallbackTopic, ...all]);
+      return fallbackTopic;
+    }
+    return { ...data, files: [] } as ReviewTopic;
+  } catch (err) {
+    console.warn("Failed to create review topic on Supabase, using local fallback:", err);
+    const all = getLocalReviewTopics();
+    saveLocalReviewTopics([fallbackTopic, ...all]);
+    return fallbackTopic;
+  }
+}
+
+export async function updateReviewTopic(id: string, updates: { title?: string; description?: string; status?: string }): Promise<boolean> {
+  // Always update local storage as well
+  const all = getLocalReviewTopics();
+  const updatedAll = all.map((t) => (t.id === id ? { ...t, ...updates, updated_at: new Date().toISOString() } : t));
+  saveLocalReviewTopics(updatedAll);
+
+  try {
+    const { error } = await supabase
+      .from("review_topics")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", id);
+
+    if (error) {
+      console.warn("Supabase update error (handled locally):", error.message);
+      return true;
+    }
+    return true;
+  } catch (err) {
+    console.warn("Failed to update review topic on Supabase:", err);
+    return true;
+  }
+}
+
+export async function deleteReviewTopic(id: string): Promise<boolean> {
+  const all = getLocalReviewTopics();
+  saveLocalReviewTopics(all.filter((t) => t.id !== id));
+
+  try {
+    const { error } = await supabase
+      .from("review_topics")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.warn("Supabase delete error (handled locally):", error.message);
+      return true;
+    }
+    return true;
+  } catch (err) {
+    console.warn("Failed to delete review topic on Supabase:", err);
+    return true;
+  }
+}
+
+export async function addReviewTopicFile(topicId: string, file: { file_name: string; file_url: string; file_size?: string }): Promise<ReviewTopicFile | null> {
+  const fallbackFile: ReviewTopicFile = {
+    id: "file_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+    topic_id: topicId,
+    file_name: file.file_name,
+    file_url: file.file_url,
+    file_size: file.file_size || null,
+    created_at: new Date().toISOString(),
+  };
+
+  const all = getLocalReviewTopics();
+  const updated = all.map((t) => {
+    if (t.id === topicId) {
+      return { ...t, files: [...(t.files || []), fallbackFile] };
+    }
+    return t;
+  });
+  saveLocalReviewTopics(updated);
+
+  try {
+    const { data, error } = await supabase
+      .from("review_topic_files")
+      .insert({ topic_id: topicId, file_name: file.file_name, file_url: file.file_url, file_size: file.file_size || null })
+      .select()
+      .single();
+
+    if (error) {
+      console.warn("Supabase add file error (saved locally):", error.message);
+      return fallbackFile;
+    }
+    return data as ReviewTopicFile;
+  } catch (err) {
+    console.warn("Failed to add review topic file on Supabase:", err);
+    return fallbackFile;
+  }
+}
+
+export async function deleteReviewTopicFile(fileId: string): Promise<boolean> {
+  const all = getLocalReviewTopics();
+  const updated = all.map((t) => ({
+    ...t,
+    files: (t.files || []).filter((f) => f.id !== fileId),
+  }));
+  saveLocalReviewTopics(updated);
+
+  try {
+    const { error } = await supabase
+      .from("review_topic_files")
+      .delete()
+      .eq("id", fileId);
+
+    if (error) {
+      console.warn("Supabase delete file error (handled locally):", error.message);
+      return true;
+    }
+    return true;
+  } catch (err) {
+    console.warn("Failed to delete review topic file on Supabase:", err);
+    return true;
+  }
+}
